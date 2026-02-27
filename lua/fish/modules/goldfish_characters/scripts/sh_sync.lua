@@ -1,0 +1,1 @@
+goldfish.sync.DefineVariable("goldfish.characters.current", "number")
