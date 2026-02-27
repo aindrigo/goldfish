@@ -54,7 +54,6 @@ function character:RemoveObserver(target)
     if self:GetPublic() then return end
 
     if not table.RemoveByValue(self._observers, target) then return end
-    self:RefreshObservers()
 
     net.Start("goldfish.characters.Remove")
     net.WriteUInt(self:GetId(), 32)
