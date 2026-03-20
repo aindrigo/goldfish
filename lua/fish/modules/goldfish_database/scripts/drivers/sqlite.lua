@@ -109,6 +109,17 @@ function sqliteDriver:_BuildQuery(query)
             queryString = queryString .. selectorString
             table.Add(queryValues, selectorValues)
         end
+    elseif queryType == goldfish.database.QueryType.DELETE then
+        local selectors = query:GetSelectors()
+        queryString = "DELETE FROM " .. pool:GetName()
+        if selectors[1] ~= nil then
+            queryString = queryString .. " WHERE "
+
+            local selectorString, selectorValues = self:_BuildSelectors(selectors)
+            queryString = queryString .. selectorString
+
+            table.Add(queryValues, selectorValues)
+        end
     end
 
     return queryString, queryValues

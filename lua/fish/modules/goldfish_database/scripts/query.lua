@@ -2,7 +2,8 @@
 goldfish.database.QueryType = {
     SELECT = 0,
     INSERT = 1,
-    UPDATE = 2
+    UPDATE = 2,
+    DELETE = 3
 }
 
 --- @enum goldfish.database.QueryState
