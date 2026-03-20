@@ -138,6 +138,19 @@ function query:Update(pool)
     self:SetValues({})
 end
 
+--- initializes this query to be a DELETE query
+--- @param pool goldfish.database.Pool
+function query:Delete(pool)
+    self:SetState(goldfish.database.QueryState.BUILDING)
+    self:Reset()
+
+    self:SetType(goldfish.database.QueryType.DELETE)
+    self:SetPool(pool)
+    self:SetSelectors({})
+    self:SetValues({})
+end
+
+
 --- submits this query to the driver
 --- @param driver? any
 function query:Submit(driver)
