@@ -21,6 +21,8 @@ function character:Sync(target)
     net.WriteData(data, dataLength)
 
     net.Send(target)
+
+    hook.Run( "Goldfish_Characters_Sync", target, self )
 end
 
 --- @return table observers
@@ -67,4 +69,14 @@ function character:Remove()
     net.Send(self:GetObservers())
 
     self:_Remove()
+end
+
+function character:Delete()
+    local query = goldfish.database.Query()
+        query:Delete( goldfish.characters.databasePool )
+        query:AddSelector( "id", self:GetId() )
+    query:Submit()
+
+    hook.Run( "Goldfish_Characters_Delete", self )
+    self:Remove()
 end

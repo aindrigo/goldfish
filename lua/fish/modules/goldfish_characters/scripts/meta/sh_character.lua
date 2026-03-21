@@ -5,6 +5,10 @@ AccessorFunc(character, "_id", "Id", FORCE_NUMBER)
 AccessorFunc(character, "_ownerSteamID", "OwnerSteamID", FORCE_STRING)
 AccessorFunc(character, "_name", "Name", FORCE_STRING)
 
+function character:tostring()
+    return ("characters.Character[%i](%s)"):format( self:GetId(), self:GetName() )
+end
+
 function character:Construct(id, steamId, name, data)
     assert(data == nil or istable(data), "invalid data type " .. type(data))
     self:SetId(id)
@@ -26,7 +30,7 @@ function character.static:From(tbl)
     return character.static:New(tbl.id, tbl.steamid, tbl.name, tbl.data)
 end
 
---- @param key any|table if value is nil then the data is overriden to this 
+--- @param key any|table if value is nil then the data is overriden to this
 --- @param value? any
 function character:SetData(key, value)
     if istable(key) then

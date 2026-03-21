@@ -1,5 +1,5 @@
 --[[
-Copyright (c) 2026 aindrigo. 
+Copyright (c) 2026 aindrigo.
 This library is licensed under the GNU Lesser General Public License version 3.0 or any later version.
 See the bottom of the file for a full copy of the GNU Lesser General Public License version 3.0.
 ]]
@@ -240,7 +240,7 @@ _serial.typeNames = {
 function _serial.GetType(value)
     if value == nil then
         return _serial.Types.NIL
-    elseif IsColor(value) then 
+    elseif IsColor(value) then
         return _serial.Types.COLOR
     end
 
