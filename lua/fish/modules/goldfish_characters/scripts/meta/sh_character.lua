@@ -5,7 +5,7 @@ AccessorFunc(character, "_id", "Id", FORCE_NUMBER)
 AccessorFunc(character, "_ownerSteamID", "OwnerSteamID", FORCE_STRING)
 AccessorFunc(character, "_name", "Name", FORCE_STRING)
 
-function character:tostring()
+function character.metatable:__tostring()
     return ("characters.Character[%i](%s)"):format( self:GetId(), self:GetName() )
 end
 
