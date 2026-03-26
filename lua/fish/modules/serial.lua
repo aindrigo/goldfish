@@ -230,7 +230,7 @@ _serial.typeNames = {
     ["number"] = _serial.Types.NUMBER,
     ["string"] = _serial.Types.STRING,
     ["table"] = _serial.Types.TABLE,
-    ["bool"] = _serial.Types.BOOLEAN,
+    ["boolean"] = _serial.Types.BOOLEAN,
     ["Color"] = _serial.Types.COLOR,
     ["Vector"] = _serial.Types.VECTOR,
     ["Angle"] = _serial.Types.ANGLES,
@@ -373,7 +373,7 @@ _serial.serializers[_serial.Types.STRING] = {
 _serial.serializers[_serial.Types.BOOLEAN] = {
     read = function(stream)
 		local value = struct.unpack("B", stream, 1)
-		return value == 1
+		return value == 1, 1
     end,
     write = function(value)
         return struct.pack("B", value and 1 or 0)

@@ -98,9 +98,11 @@ function sqliteDriver:_BuildQuery(query)
             table.insert(queryValues, value)
 
             if index < valueCount then
-                valuesString = valuesString .. ", "
+                valuesString = valuesString .. ","
             end
         end
+
+        queryString = queryString .. " " .. valuesString
 
         if selectors[1] ~= nil then
             queryString = queryString .. " WHERE "
