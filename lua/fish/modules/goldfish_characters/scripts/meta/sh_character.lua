@@ -21,6 +21,8 @@ function character:Construct(id, steamId, name, data)
     if SERVER then
         self._observers = {}
     end
+
+    self.vars = {}
 end
 
 --- builds a character from a row table
@@ -69,4 +71,24 @@ end
 --- internal: removes the character, invalidating it
 function character:_Remove()
     goldfish.characters.data[self:GetId()] = nil
+end
+
+--- @param id string
+--- @param default any
+--- @return any?
+function character:GetVar( id, default )
+    if self.vars[id] == nil then return default end
+
+    return self.vars[id]
+end
+
+--- @param id string
+--- @param value any
+--- @return any?
+function character:SetVar( id, value )
+    self.vars[id] = value
+
+    if SERVER then
+        self:SyncVar( id )
+    end
 end

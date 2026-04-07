@@ -2,6 +2,7 @@ util.AddNetworkString("goldfish.characters.Sync")
 util.AddNetworkString("goldfish.characters.Remove")
 util.AddNetworkString("goldfish.characters.Create")
 util.AddNetworkString("goldfish.characters.Select")
+util.AddNetworkString("goldfish.characters.SyncVar")
 
 net.Receive("goldfish.characters.Create", function(len, ply)
     local ct = CurTime()

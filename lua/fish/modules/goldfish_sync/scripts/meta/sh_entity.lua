@@ -28,18 +28,18 @@ function fish.meta.Entity:SetSyncVar(id, value)
         if value == nil then
             net.Start("goldfish.sync.unset")
             net.WriteUInt(entIndex, 16)
-            net.WriteUInt(id, 16)
+            net.WriteUInt(id --[[@as number]], 16)
             net.Send(target)
         else
             net.Start("goldfish.sync.set")
             net.WriteUInt(entIndex, 16)
-            net.WriteUInt(id, 16)
+            net.WriteUInt(id --[[@as number]], 16)
 
             local stream = serial.Serialize(value, variable.type)
             local streamSize = #stream
             net.WriteUInt(streamSize, 16)
             net.WriteData(stream, streamSize)
-    
+
             net.Send(target)
         end
     end
@@ -60,7 +60,7 @@ function fish.meta.Entity:GetSyncVar(id, default)
     local entIndex = self:EntIndex()
 
     local entityData = goldfish.sync.data[entIndex] or {}
-    local variableData = entityData.variables or {}
+    variableData = entityData.variables or {}
 
     local value = variableData[id]
     if value == nil then

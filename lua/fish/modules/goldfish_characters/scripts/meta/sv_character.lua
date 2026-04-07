@@ -20,6 +20,12 @@ function character:Sync(target)
     net.WriteUInt(dataLength, 16)
     net.WriteData(data, dataLength)
 
+    local vars = serial.Serialize(self.vars)
+    local varsLength = #vars
+
+    net.WriteUInt(varsLength, 16)
+    net.WriteData(vars, varsLength)
+
     net.Send(target)
 
     hook.Run( "Goldfish_Characters_Sync", target, self )
@@ -79,4 +85,31 @@ function character:Delete()
 
     hook.Run( "Goldfish_Characters_Delete", self )
     self:Remove()
+end
+
+function character:Save()
+    local query = goldfish.database.Query()
+        query:Update( goldfish.characters.databasePool )
+        query:AddSelector( "id", self:GetId() )
+        query:AddValue( "name", self:GetName() )
+        query:AddValue( "data", self:GetData() )
+    query:Submit()
+
+    hook.Run( "Goldfish_Characters_Save", self )
+end
+
+
+--- @param id string
+function character:SyncVar( id )
+    local data = goldfish.characters.vars[id]
+    if not data then return end
+
+    local receivers = (data.isPrivate and self:GetObservers()) or player.GetAll()
+
+    local stream = serial.Serialize( self:GetVar( id ) )
+
+    net.Start( "goldfish.characters.SyncVar" )
+        net.WriteUInt( data.index, goldfish.characters.varBits )
+        net.WriteData( stream, #stream )
+    net.Send( receivers )
 end

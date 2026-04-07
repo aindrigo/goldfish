@@ -4,7 +4,7 @@ goldfish.sync.variableNames = goldfish.sync.variableNames or {}
 --- defines a sync variable
 --- @param name string
 --- @param typeId string|serial.Types
---- @param flags goldfish.sync.Flags
+--- @param flags? goldfish.sync.Flags
 --- @return number variable Id
 function goldfish.sync.DefineVariable(name, typeId, flags)
     if isstring(typeId) then
@@ -24,6 +24,6 @@ function goldfish.sync.DefineVariable(name, typeId, flags)
         id = table.insert(goldfish.sync.variables, variableData)
         goldfish.sync.variableNames[name] = id
     end
-    
+
     return id
 end
