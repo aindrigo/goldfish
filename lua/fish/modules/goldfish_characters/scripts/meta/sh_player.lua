@@ -1,6 +1,7 @@
+--- @return table<number, goldfish.characters.Character>
 function fish.meta.Player:GetCharacters()
-    local characterIds = goldfish.characters.playerCharacters[self:UserID()]
-    if not istable(characterIds) then return nil end
+    local characterIds = goldfish.characters.playerCharacters[self:SteamID()]
+    if not istable(characterIds) then return {} end
 
     local characters = {}
     for _, id in ipairs(characterIds) do
@@ -13,6 +14,7 @@ function fish.meta.Player:GetCharacters()
     return characters
 end
 
+--- @return goldfish.characters.Character?
 function fish.meta.Player:GetCharacter()
     local characterId = self:GetSyncVar("goldfish.characters.current")
     if not isnumber(characterId) then return nil end

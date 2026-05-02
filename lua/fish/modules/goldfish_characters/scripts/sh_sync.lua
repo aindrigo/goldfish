@@ -6,6 +6,7 @@ goldfish.sync.DefineVariable("goldfish.characters.current", "number")
 --- @field isPrivate? boolean
 
 goldfish.characters.vars = {}
+goldfish.characters.varIndices = {}
 goldfish.characters.varBits = 2
 
 
@@ -18,6 +19,7 @@ function goldfish.characters.DefineVar( varData, noAccessors )
 
     goldfish.characters.vars[varData.id] = varData
     varData.index = table.Count(goldfish.characters.vars)
+    goldfish.characters.varIndices[varData.index] = varData.id
 
     if varData.index > bit.lshift( 1, goldfish.characters.varBits ) then
         goldfish.characters.varBits = goldfish.characters.varBits + 1
@@ -28,10 +30,10 @@ function goldfish.characters.DefineVar( varData, noAccessors )
         local character = goldfish.characters.Character
 
         character.vars = character.vars or {}
-        character["Set"..name] = function( self, value )
+        character["Set"..name] = function( self, value, noSend )
             self.vars[varData.id] = value
 
-            if SERVER then
+            if SERVER and not noSend then
                 self:SyncVar( varData.id )
             end
         end
@@ -41,5 +43,5 @@ function goldfish.characters.DefineVar( varData, noAccessors )
         end
     end
 
-    return index
+    return varData.index
 end

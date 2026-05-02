@@ -27,11 +27,12 @@ net.Receive( "goldfish.characters.SyncVar", function( len )
     local characterId = net.ReadUInt( 32 )
     local id = net.ReadUInt( goldfish.characters.varBits )
 
-    local binSize = len - (goldfish.characters.varBits + 32) * 8
-    local value = serial.Deserialize( net.ReadData( binSize ) )
+    local bitsSize = len - 32 - (goldfish.characters.varBits)
+    local value = serial.Deserialize( net.ReadData( math.ceil( bitsSize / 8 ) ) )
 
     local character = goldfish.characters.data[characterId]
     if not character then return end
 
-    character:SetVar( id, value )
+    local key = goldfish.characters.varIndices[id]
+    character:SetVar( key, value )
 end )

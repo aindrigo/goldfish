@@ -31,10 +31,11 @@ net.Receive("goldfish.characters.Create", function(len, ply)
 
         local character = goldfish.characters.Character(id, steamId, name, characterData)
         character:AddObserver(ply)
-
         table.insert(characterIds, id)
 
         hook.Run("Goldfish_Characters_PostCreate", ply, character)
+
+        character:Sync(ply)
     end)
 
     local status, result = coroutine.resume(co)
@@ -56,12 +57,13 @@ net.Receive("goldfish.characters.Select", function(_, ply)
 
     local characterId = net.ReadUInt(16)
     local character = goldfish.characters.data[characterId]
+    local oldCharacter = ply:GetCharacter()
 
     if character:GetOwnerSteamID() ~= ply:SteamID() then
         ply:Kick("Tried to load someone else's character")
         return
     end
 
-    hook.Run("Goldfish_Characters_Select", ply, character)
+    hook.Run("Goldfish_Characters_Select", ply, character, oldCharacter )
     ply:SetCharacter( characterId )
 end)

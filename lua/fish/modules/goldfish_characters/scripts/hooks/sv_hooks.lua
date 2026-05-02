@@ -8,7 +8,9 @@ function HOOKS:PlayerDisconnected(ply)
 
     for _, characterId in ipairs(characterIds) do
         local character = goldfish.characters.data[characterId]
+        character:Save()
         character:Remove()
+        print( "Saving character", tostring( character ) )
     end
 
     goldfish.characters.playerCharacters[ply:SteamID()] = nil
@@ -21,4 +23,11 @@ function HOOKS:OnRequestFullUpdate(data)
 
     local ply = Player(data.userid)
     goldfish.characters.InitPlayer(ply)
+end
+
+function HOOKS:ShutDown()
+    for id, character in pairs( goldfish.characters.data ) do
+        print( "Saving character", tostring( character ) )
+        character:Save()
+    end
 end

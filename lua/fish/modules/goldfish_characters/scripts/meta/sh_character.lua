@@ -23,6 +23,8 @@ function character:Construct(id, steamId, name, data)
     end
 
     self.vars = {}
+
+    self.ownerCache = setmetatable( {}, { __mode = "kv" } )
 end
 
 --- builds a character from a row table
@@ -84,11 +86,29 @@ end
 
 --- @param id string
 --- @param value any
---- @return any?
 function character:SetVar( id, value )
+    self.vars = self.vars or {}
+
     self.vars[id] = value
 
     if SERVER then
         self:SyncVar( id )
     end
 end
+
+--- @return Player?
+function character:GetOwner()
+    if IsValid( self.ownerCache[1] ) then
+        return self.ownerCache[1]
+    end
+
+    local client = player.GetBySteamID( self:GetOwnerSteamID() )
+    if IsValid( client ) then
+        self.ownerCache[1] = client
+
+        --- @diagnostic disable-next-line
+        return client
+    end
+end
+
+character.GetPlayer = character.GetOwner
