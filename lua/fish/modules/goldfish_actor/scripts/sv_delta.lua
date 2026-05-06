@@ -75,7 +75,6 @@ function HOOKS:Think()
 
     for ply, data in pairs(playerData) do
         if data.operationCount < 1 then continue end
-        print("sending2")
         net.Start("goldfish.actor.operations")
         net.WriteUInt(data.operationCount, 32)
 

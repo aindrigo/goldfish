@@ -110,8 +110,8 @@ function goldfish.actor.Instantiate(name, id)
     local instance = {}
     setmetatable(instance, prototype.metatable)
 
-    instance:SetActorIndex(id)
     instance:SetActorName(name)
+    instance:SetActorIndex(id)
     instance:Construct()
 
     goldfish.actor.objects[name][id] = instance

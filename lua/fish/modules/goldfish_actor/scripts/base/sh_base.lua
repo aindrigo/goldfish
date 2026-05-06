@@ -1,7 +1,7 @@
 local actor_base = goldfish.actor.actor_base
 
-AccessorFunc(actor_base, "m_iActorIndex", "ActorIndex", FORCE_NUMBER)
 AccessorFunc(actor_base, "m_sActorName", "ActorName", FORCE_STRING)
+AccessorFunc(actor_base, "m_iActorIndex", "ActorIndex", FORCE_NUMBER)
 
 function actor_base.metatable:__tostring()
     return goldfish.actor.ToString(self:GetActorName(), self:GetActorIndex())
@@ -70,5 +70,9 @@ end
 
 --- internal: destroys this object
 function actor_base:_Destroy()
+    if isfunction(self.OnDestroy) then
+        self:OnDestroy()
+    end
+
     goldfish.actor.objects[self:GetActorName()][self:GetActorIndex()] = nil
 end
