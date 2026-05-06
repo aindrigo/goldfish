@@ -1,8 +1,11 @@
 local actor_base = goldfish.actor.actor_base
 
-
 AccessorFunc(actor_base, "m_iActorIndex", "ActorIndex", FORCE_NUMBER)
 AccessorFunc(actor_base, "m_sActorName", "ActorName", FORCE_STRING)
+
+function actor_base.metatable:__tostring()
+    return goldfish.actor.ToString(self:GetActorName(), self:GetActorIndex())
+end
 
 function actor_base:IsValid()
     local index = self:GetActorIndex()

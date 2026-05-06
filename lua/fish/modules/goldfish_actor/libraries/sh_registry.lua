@@ -1,4 +1,4 @@
-    --- defines an actor in the registry
+--- defines an actor in the registry
 --- @param name string
 --- @param baseClass? string|boolean
 function goldfish.actor.Define(name, baseClass)
@@ -34,8 +34,13 @@ function goldfish.actor.Define(name, baseClass)
         return goldfish.actor.Instantiate(name, ...)
     end
 
+    function prototype.static:Get(id)
+        return goldfish.actor.objects[name][id]
+    end
+
     function prototype.static:Deregister()
         goldfish.actor.registry[name] = nil
+        goldfish.actor.objects[name] = nil
     end
 
     function prototype:Construct() 
@@ -43,6 +48,11 @@ function goldfish.actor.Define(name, baseClass)
 
     setmetatable(prototype, {
         __call = function(prototype, ...)
+            local inst = prototype.static:Get(...)
+            if IsValid(inst) then
+                return inst
+            end
+
             return prototype.static:New(...)
         end
     })
@@ -106,6 +116,13 @@ function goldfish.actor.Instantiate(name, id)
 
     goldfish.actor.objects[name][id] = instance
     return instance
+end
+
+--- @param name string
+--- @param index number
+--- @return string
+function goldfish.actor.ToString(name, index)
+    return string.format("%s %i", name, index)
 end
 
 setmetatable(goldfish.actor, {

@@ -1,31 +1,47 @@
 util.AddNetworkString("goldfish.actor.operations")
 
+
 function HOOKS:Think()
-    --- 1: op count, 2: buffer, 3: if its a full reconcile
+    --- @class goldfish.actor.PlayerUpdateData
+    --- @field operationCount number
+    --- @field buffer serial.Buffer
+    --- @field changedObservers table<string, boolean>
+
+    --- @type table<goldfish.actor.PlayerUpdateData>
     local playerData = {}
 
     for id, state in pairs(goldfish.actor.states) do
         local ply = Player(id)
         if not IsValid(ply) then continue end
 
-        if not state.valid then
-            for name, objects in pairs(goldfish.actor.objects) do
-                for index, object in pairs(objects) do
-                    if not object:HasObserver(ply) then continue end
-
-                    playerData[ply] = playerData[ply] or { 0, serial.Buffer(), true }
-                    local data = playerData[ply]
-                    local buf = data[2]
-        
-                    goldfish.actor.SerializeOperation(buf, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index, object:GetVariables()))
-                    data[1] = data[1] + 1
-
-                    continue
+        for name, objects in pairs(goldfish.actor.objects) do
+            for index, object in pairs(objects) do
+                local data = playerData[ply]
+                if not data then
+                    data = {}
+                    data.operationCount = 0
+                    data.buffer = serial.Buffer()
+                    data.changedObservers = {}
+                    playerData[ply] = data
                 end
-            end
 
-            state.valid = true
-            continue
+                local key = goldfish.actor.ToString(name, index)
+                if object:HasObserver(ply) and not state.observing[key] then
+                    goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index, object:GetVariables()))
+                    data.operationCount = data.operationCount + 1
+
+                    state.observing[key] = nil
+                    data.changedObservers[key] = true
+                elseif not object:HasObserver(ply) and state.observing[key] then
+                    goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
+                    data.operationCount = data.operationCount + 1
+
+                    state.observing[key] = nil
+                    data.changedObservers[key] = true
+                end
+                
+                continue
+            end
         end
     end
 
@@ -36,24 +52,34 @@ function HOOKS:Think()
             local state = goldfish.actor.states[ply:UserID()]
             if not istable(state) then continue end
 
-            playerData[ply] = playerData[ply] or { 0, serial.Buffer(), false }
+
             local data = playerData[ply]
+            if not data then
+                data = {}
+                data.operationCount = 0
+                data.buffer = serial.Buffer()
+                data.changedObservers = {}
 
-            if data[3] then continue end
-            local buf = data[2]
+                playerData[ply] = data
+            end
 
-            goldfish.actor.SerializeOperation(buf, operation)
-            data[1] = data[1] + 1
+            local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
+            if data.changedObservers[key] then continue end
+
+            goldfish.actor.SerializeOperation(data.buffer, operation)
+            data.operationCount = data.operationCount + 1
         end
     end
 
     goldfish.actor.queue = {}
 
     for ply, data in pairs(playerData) do
-        net.Start("goldfish.actor.operations")
-        net.WriteUInt(data[1], 32)
+        if data.operationCount < 1 then continue end
 
-        local buf = data[2]:GetData()
+        net.Start("goldfish.actor.operations")
+        net.WriteUInt(data.operationCount, 32)
+
+        local buf = data.buffer:GetData()
         local len = #buf
 
         net.WriteUInt(len, 16)
@@ -64,7 +90,7 @@ end
 
 function HOOKS:Goldfish_Sync_OnPlayerReady(ply)
     local state = {}
-    state.valid = false
+    state.observing = {}
 
     goldfish.actor.states[ply:UserID()] = state
 end
@@ -97,6 +123,10 @@ function goldfish.actor.QueueOperation(operation)
             elseif (operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy) and isThisVariableOp then
                 table.remove(goldfish.actor.queue, i)
                 i = i - 1
+            elseif operation.type == goldfish.actor.OperationType.ObjectDestroy and op.type == goldfish.actor.OperationType.ObjectCreate then
+                table.remove(goldfish.actor.queue, i)
+                i = i - 1
+                return
             end
         end
     end
