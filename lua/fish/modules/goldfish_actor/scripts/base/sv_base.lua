@@ -26,11 +26,19 @@ function actor_base:VariableSet(id, value)
     local var = self.m_tVariables[id]
     assert(istable(var), "no such variable " .. id)
 
+    local observers = self:GetObservers()
+    for i = 1, #observers do
+        if not self:ObserverCanSee(observers[i], id) then
+            table.remove(observers, i)
+            i = i - 1
+        end
+    end
+    
     if value ~= nil then
         assert(serial.GetType(value) == var.type, "mismatching type for variable " .. id)
-        self:QueueOperation(goldfish.actor.OperationType.VariableSet, self:GetObservers(), id, value)
+        self:QueueOperation(goldfish.actor.OperationType.VariableSet, observers, id, value)
     else
-        self:QueueOperation(goldfish.actor.OperationType.VariableReset, self:GetObservers(), id)
+        self:QueueOperation(goldfish.actor.OperationType.VariableReset, observers, id)
     end
 
     self:_VariableSet(id, value)
@@ -50,6 +58,13 @@ function actor_base:HasObserver(observer)
     return true
 end
 
+--- server-only: checks if an observer can see a variable, defined to be re-implemented if necessary
+--- @param observer Player
+--- @param id string
+--- @return boolean
+function actor_base:ObserverCanSee(observer, id)
+    return true
+end
 
 --- server-only: destroys this object
 function actor_base:Destroy()

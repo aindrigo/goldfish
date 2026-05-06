@@ -97,13 +97,21 @@ end
 
 --- instantiates an actor object
 --- @param name string
---- @param id? number
+--- @param ... any? constructor parameters
+--- @overload fun(id: number, name: string, ...: any?)
 --- @return table class
-function goldfish.actor.Instantiate(name, id)
+function goldfish.actor.Instantiate(name, ...)
     local prototype = goldfish.actor.GetDefinition(name)
     assert(istable(prototype), "no such actor type " .. name)
 
-    if not isnumber(id) then
+    local id = 0
+
+    if isnumber(name) then
+        id = name
+        name = select(1, ...)
+
+        assert(isstring(name), "invalid argument type passed")
+    else
         id = goldfish.actor.GenerateIndex(name)
     end
 
@@ -112,7 +120,7 @@ function goldfish.actor.Instantiate(name, id)
 
     instance:SetActorName(name)
     instance:SetActorIndex(id)
-    instance:Construct()
+    instance:Construct(...)
 
     goldfish.actor.objects[name][id] = instance
     return instance
