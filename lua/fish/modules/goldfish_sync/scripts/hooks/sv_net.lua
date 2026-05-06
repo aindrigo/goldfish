@@ -5,8 +5,8 @@ util.AddNetworkString("goldfish.sync.ready")
 
 
 net.Receive("goldfish.sync.ready", function(_, ply)
-    if ply.m_bGoldfishSyncReady then return end
-    ply.m_bGoldfishSyncReady = true
+    if not goldfish.sync.connecting[ply:UserID()] then return end
+    goldfish.sync.connecting[ply:UserID()] = nil
 
     hook.Run("Goldfish_Sync_OnPlayerReady", ply)
 end)

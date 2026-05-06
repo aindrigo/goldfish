@@ -30,7 +30,7 @@ function HOOKS:Think()
                     goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index, object:GetVariables()))
                     data.operationCount = data.operationCount + 1
 
-                    state.observing[key] = nil
+                    state.observing[key] = true
                     data.changedObservers[key] = true
                 elseif not object:HasObserver(ply) and state.observing[key] then
                     goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
@@ -75,7 +75,7 @@ function HOOKS:Think()
 
     for ply, data in pairs(playerData) do
         if data.operationCount < 1 then continue end
-
+        print("sending2")
         net.Start("goldfish.actor.operations")
         net.WriteUInt(data.operationCount, 32)
 
