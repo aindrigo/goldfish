@@ -1,5 +1,4 @@
-gameevent.Listen("OnRequestFullUpdate")
-function HOOKS:OnRequestFullUpdate(data)
+function HOOKS:Goldfish_Sync_OnPlayerReady(data)
     local ply = Player(data.userid)
     if not IsValid(ply) then return end
 

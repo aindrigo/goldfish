@@ -251,44 +251,6 @@ end
 --#region serializers
 _serial.serializers = {}
 
-
-function _serial.Serialize(value, typeId)
-    local writeType = false
-	if not isnumber(typeId) then
-        writeType = true
-        typeId = _serial.GetType(value)
-    end
-
-	local serializer = _serial.serializers[typeId]
-	assert(istable(serializer), "cannot serialize type")
-
-	local stream = ""
-    if writeType then
-        stream = stream .. struct.pack("B", typeId)
-    end
-
-	stream = stream .. serializer.write(value)
-
-	return stream
-end
-
-function _serial.Deserialize(stream, typeId)
-    local length = 0
-    if not isnumber(typeId) then
-        typeId = struct.unpack("B", stream, 1)
-	    assert(isnumber(typeId), "cannot deserialize")
-
-        stream = string.sub(stream, 2, -1)
-        length = length + 1
-    end
-
-	local serializer = _serial.serializers[typeId]
-	assert(istable(serializer), "cannot deserialize type")
-
-    local value, valueSize = serializer.read(stream)
-	return value, valueSize + length
-end
-
 _serial.serializers[_serial.Types.NIL] = {
     read = function() return nil, 0 end,
     write = function() return "" end
@@ -382,7 +344,8 @@ _serial.serializers[_serial.Types.BOOLEAN] = {
 
 _serial.serializers[_serial.Types.TABLE] = {
     read = function(stream)
-        local memberCount, memberCountSize = _serial.Deserialize(stream)
+        local memberCount, memberCountSize = _serial.Deserialize(stream, _serial.Types.NUMBER)
+
 		local totalSize = memberCountSize
 		stream = string.sub(stream, 1 + memberCountSize, -1)
 
@@ -401,13 +364,15 @@ _serial.serializers[_serial.Types.TABLE] = {
         return result, totalSize
     end,
     write = function(tbl)
-        local memberCount = table.Count(tbl)
-        local stream = _serial.Serialize(memberCount)
+        local memberCount = 0
+        local stream = ""
 
         for key, value in pairs(tbl) do
             stream = stream .. _serial.Serialize(key) .. _serial.Serialize(value)
+            memberCount = memberCount + 1 
         end
 
+        stream = _serial.Serialize(memberCount, _serial.Types.NUMBER) .. stream
 		return stream
     end
 }
@@ -459,6 +424,44 @@ _serial.serializers[_serial.Types.ENTITY] = {
     end
 }
 
+
+function _serial.Serialize(value, typeId)
+    local writeType = false
+	if not isnumber(typeId) then
+        writeType = true
+        typeId = _serial.GetType(value)
+    end
+
+	local serializer = _serial.serializers[typeId]
+	assert(istable(serializer), "cannot serialize type")
+
+	local stream = ""
+    if writeType then
+        stream = stream .. struct.pack("B", typeId)
+    end
+
+	stream = stream .. serializer.write(value)
+
+	return stream
+end
+
+function _serial.Deserialize(stream, typeId)
+    local length = 0
+    if not isnumber(typeId) then
+        typeId = struct.unpack("B", stream, 1)
+	    assert(isnumber(typeId), "cannot deserialize")
+
+        stream = string.sub(stream, 2, -1)
+        length = length + 1
+    end
+
+	local serializer = _serial.serializers[typeId]
+	assert(istable(serializer), "cannot deserialize type")
+
+    local value, valueSize = serializer.read(stream)
+	return value, valueSize + length
+end
+
 --#endregion
 --#region buffer
 local buffer = {}
@@ -475,7 +478,7 @@ function buffer:New(source)
         MetaName = "serial.Buffer"
     })
 
-	instance:SetCursor(0)
+	instance:SetCursor(1)
     instance:SetData(source or "")
     return instance
 end
@@ -577,7 +580,10 @@ function buffer:ReadTyped(typeid)
     local serializer = _serial.serializers[typeid]
 
     assert(istable(serializer), "cannot deserialize type " .. tostring(typeid))
-    return serializer.read(self._data)
+    local data, len = serializer.read(string.sub(self._data, self._cursor))
+    self._cursor = self._cursor + len
+
+    return data
 end
 
 function buffer:WriteTyped(value, typeId)

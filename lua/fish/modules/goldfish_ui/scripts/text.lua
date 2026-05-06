@@ -1,67 +1,111 @@
-goldfish.ui.textShadowColor = Color(40, 40, 40, 200)
 
 --- gets or creates a font
---- @param fontName string
---- @param fontSize number
---- @param fontWeight? number
+--- @param properties table see surface.CreateFont
 --- @return string fontId
-function goldfish.ui.Font(fontName, fontSize, fontWeight)
-    fontWeight = fontWeight or 800
-    
-    local id = fontName .. "-" .. tostring(fontSize) .. "-" .. tostring(fontWeight)
+function goldfish.ui.Font(properties)
+    properties.weight = properties.weight or 800
+    if properties.antialias == nil then
+        properties.antialias = true
+    end
+
+    local id = ""
+    for _, value in SortedPairs(properties) do
+        id = id .. tostring(value) .. ";"
+    end
+
+    id = string.TrimRight(id, ";")
+
     if goldfish.ui.fonts[id] then
         return id
     end
 
-    goldfish.ui.fonts[id] = true
-    surface.CreateFont(id, {
-        font = fontName,
-        size = fontSize,
-        weight = fontWeight,
-        antialias = true,
-        shadow = false
-    })
+    properties.shadow = false
 
-    surface.CreateFont(id .. "-shadow", {
-        font = fontName,
-        size = fontSize,
-        weight = fontWeight,
-        antialias = true,
-        shadow = false,
-        blursize = 4
-    })
+    goldfish.ui.fonts[id] = properties
+    surface.CreateFont(id, properties)
 
+    local flags = properties.flags or 0
+    if istable(flags) then
+        local flagList = flags
+        flags = 0
+
+        for _, flag in ipairs(flagList) do
+            flags = bit.bor(flags, flag)
+        end
+    end
+
+    properties.flags = flags
+
+    if bit.band(flags, goldfish.ui.FontFlags.Shadow) == goldfish.ui.FontFlags.Shadow then
+        local oldBlurSize = properties.blursize
+
+        properties.blursize = properties.shadowsize or 4
+        surface.CreateFont(id .. "-shadow", properties)
+
+        properties.blursize = oldBlurSize
+    end
+
+    if bit.band(flags, goldfish.ui.FontFlags.Glow) == goldfish.ui.FontFlags.Glow then
+        local oldBlurSize = properties.blursize
+
+        properties.blursize = properties.glowsize or 16
+        surface.CreateFont(id .. "-glow", properties)
+
+        properties.blursize = oldBlurSize
+    end
+    
     return id
 end
 
+--- @param text string
+--- @param x number
+--- @param y number
+--- @param font string see goldfish.ui.Font
+--- @param alignmentX? number
+--- @param alignmentY? number
+--- @param color? Color
+--- @return number text width
+--- @return number text height
 function goldfish.ui.DrawText(text, x, y, font, alignmentX, alignmentY, color)
-    assert(goldfish.ui.fonts[font], "no such font " .. id)
+    local fontProperties = goldfish.ui.fonts[font]
+    assert(istable(fontProperties), "no such font " .. font)
     alignmentX = alignmentX or TEXT_ALIGN_LEFT
     alignmentY = alignmentY or TEXT_ALIGN_TOP
 
     surface.SetFont(font)
-    local textSizeX, textSizeY = surface.GetTextSize(text)
+    local textSizeW, textSizeH = surface.GetTextSize(text)
     if alignmentX == TEXT_ALIGN_CENTER then
-        x = x - textSizeX / 2
+        x = x - textSizeW / 2
     elseif alignmentX == TEXT_ALIGN_RIGHT then
-        x = x - textSizeX
+        x = x - textSizeW
     end
 
     if alignmentY == TEXT_ALIGN_CENTER then
-        y = y + textSizeY / 2
+        y = y + textSizeH / 2
     elseif alignmentY == TEXT_ALIGN_BOTTOM then
-        y = y + textSizeY
+        y = y + textSizeH
     end
 
-    local shadowX = x + 4
-    local shadowY = y + 4
-    surface.SetFont(id .. "-shadow")
-    surface.SetTextPos(shadowX, shadowY)
-    surface.SetDrawColor(goldfish.ui.textShadowColor)
-    surface.DrawText(text)
+    if bit.band(fontProperties.flags, goldfish.ui.FontFlags.Shadow) == goldfish.ui.FontFlags.Shadow then
+        local shadowX = x + 2
+        local shadowY = y + 2
+        surface.SetFont(font .. "-shadow")
+        surface.SetTextPos(shadowX, shadowY)
+        surface.SetTextColor(fontProperties.shadowcolor or goldfish.ui.textShadowColor)
+        surface.DrawText(text)
+    end
 
-    surface.SetFont(id)
-    surface.SetDrawColor(color)
+    if bit.band(fontProperties.flags, goldfish.ui.FontFlags.Glow) == goldfish.ui.FontFlags.Glow then
+        surface.SetFont(font .. "-glow")
+        surface.SetTextPos(x, y)
+        surface.SetTextColor(color or color_white)
+        surface.DrawText(text)
+    end
+
+    surface.SetFont(font)
+    surface.SetTextColor(color or color_white)
     surface.SetTextPos(x, y)
     surface.DrawText(text)
+
+    return textSizeW, textSizeH
 end
