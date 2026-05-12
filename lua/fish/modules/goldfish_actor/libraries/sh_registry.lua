@@ -101,9 +101,6 @@ end
 --- @overload fun(id: number, name: string, ...: any?)
 --- @return table class
 function goldfish.actor.Instantiate(name, ...)
-    local prototype = goldfish.actor.GetDefinition(name)
-    assert(istable(prototype), "no such actor type " .. name)
-
     local id = 0
 
     if isnumber(name) then
@@ -115,12 +112,15 @@ function goldfish.actor.Instantiate(name, ...)
         id = goldfish.actor.GenerateIndex(name)
     end
 
+    local prototype = goldfish.actor.GetDefinition(name)
+    assert(istable(prototype), "no such actor type " .. name)
+
     local instance = {}
     setmetatable(instance, prototype.metatable)
 
     instance:SetActorName(name)
     instance:SetActorIndex(id)
-    instance:Construct(...)
+    instance:Construct(select(2, ...))
 
     goldfish.actor.objects[name][id] = instance
     return instance
