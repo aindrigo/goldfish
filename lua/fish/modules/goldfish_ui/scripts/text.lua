@@ -1,4 +1,3 @@
-
 --- gets or creates a font
 --- @param properties table see surface.CreateFont
 --- @return string fontId
@@ -53,7 +52,7 @@ function goldfish.ui.Font(properties)
 
         properties.blursize = oldBlurSize
     end
-    
+
     return id
 end
 
@@ -80,10 +79,10 @@ function goldfish.ui.DrawText(text, x, y, font, alignmentX, alignmentY, color)
         x = x - textSizeW
     end
 
-    if alignmentY == TEXT_ALIGN_CENTER then
-        y = y + textSizeH / 2
-    elseif alignmentY == TEXT_ALIGN_BOTTOM then
-        y = y + textSizeH
+    if alignmentY == TEXT_ALIGN_BOTTOM then
+        y = y - textSizeH
+    elseif alignmentY == TEXT_ALIGN_CENTER then
+        y = y - (textSizeH / 2)
     end
 
     if bit.band(fontProperties.flags, goldfish.ui.FontFlags.Shadow) == goldfish.ui.FontFlags.Shadow then

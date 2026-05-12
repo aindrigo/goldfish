@@ -61,7 +61,6 @@ function goldfish.actor.BuildOperation(operation, observers, objectName, objectI
     error("not supposed to be here")
 end
 
-
 --- internal: serializes goldfish.actor.Operation
 --- @param buf serial.Buffer
 --- @param operation goldfish.actor.Operation
@@ -71,11 +70,11 @@ function goldfish.actor.SerializeOperation(buf, operation)
     buf:WriteInt(operation.objectIndex, true)
 
     local op = operation.type
-    
+
     if op == goldfish.actor.OperationType.VariableSet then
         buf:WriteString(operation.variableName)
         buf:WriteAny(operation.value)
-    elseif op == goldfish.actor.OperationType.VariableReset then 
+    elseif op == goldfish.actor.OperationType.VariableReset then
         buf:WriteString(operation.variableName)
     elseif op == goldfish.actor.OperationType.ObjectCreate then
         buf:WriteTyped(operation.variables, serial.Types.TABLE)
@@ -88,10 +87,10 @@ end
 function goldfish.actor.DeserializeOperation(buf)
     local op = buf:ReadByte(true)
     local objectName, objectIndex = buf:ReadString(), buf:ReadInt(true)
-    
+
     if op == goldfish.actor.OperationType.VariableSet then
         return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString(), buf:ReadAny())
-    elseif op == goldfish.actor.OperationType.VariableReset then 
+    elseif op == goldfish.actor.OperationType.VariableReset then
         return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString())
     elseif op == goldfish.actor.OperationType.ObjectCreate then
         return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadTyped(serial.Types.TABLE))
@@ -102,14 +101,14 @@ function goldfish.actor.DeserializeOperation(buf)
     error("invalid operation type " .. tostring(op))
 end
 
---- @param operation goldfish.actor.Operation 
+--- @param operation goldfish.actor.Operation
 --- @return boolean, string success or error
 function goldfish.actor.PerformOperation(operation)
     local op = operation.type
 
     local objects = goldfish.actor.objects[operation.objectName]
     if not istable(objects) then
-        return false, "no registry objects with name " .. op.objectName
+        return false, "no registry objects with name " .. operation.objectName
     end
 
     local object = objects[operation.objectIndex]
@@ -119,7 +118,7 @@ function goldfish.actor.PerformOperation(operation)
         end
 
         object:_VariableSet(operation.variableName, operation.value)
-    elseif op == goldfish.actor.OperationType.VariableReset then 
+    elseif op == goldfish.actor.OperationType.VariableReset then
         object:_VariableSet(operation.variableName, nil)
     elseif op == goldfish.actor.OperationType.ObjectCreate then
         if IsValid(object) then
@@ -128,7 +127,7 @@ function goldfish.actor.PerformOperation(operation)
 
         object = goldfish.actor.Instantiate(operation.objectName, operation.objectIndex)
         object:SetVariables(operation.variables)
-    elseif op == goldfish.actor.OperationType.ObjectDestroy then 
+    elseif op == goldfish.actor.OperationType.ObjectDestroy then
         if not IsValid(object) then
             return false, "tried to destroy non-existent object " .. tostring(operation.objectIndex)
         end
