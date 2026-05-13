@@ -615,35 +615,17 @@ function buffer:ReadDouble()
     return value
 end
 
-function buffer:ReadTyped(typeid)
-    local serializer = _serial.serializers[typeid]
-
-    assert(istable(serializer), "cannot deserialize type " .. tostring(typeid))
-    local data, len = serializer.read(string.sub(self._data, self._cursor))
-    self._cursor = self._cursor + len
-
-    return data
-end
-
-function buffer:WriteTyped(value, typeId)
-    if not isnumber(typeId) then
-        typeId = _serial.GetType(value)
-    end
-    local serializer = _serial.serializers[typeId]
-
-    assert(istable(serializer), "cannot serialize type " .. tostring(typeId))
-    self._data = self._data .. serializer.write(value)
-end
-
-function buffer:ReadAny()
-    local value, size = _serial.Deserialize(self._data)
+--- @param typeId? serial.Types see serial.Deserialize
+function buffer:Read(typeId)
+    local value, size = _serial.Deserialize(string.sub(self._data, self._cursor), typeId)
     self._cursor = self._cursor + size
 
     return value
 end
 
-function buffer:WriteAny(value)
-    self._data = self._data .. _serial.Serialize(value)
+--- @param typeId? serial.Types see serial.Serialize
+function buffer:Write(value, typeId)
+    self._data = self._data .. _serial.Serialize(value, typeId)
 end
 
 setmetatable(buffer, {

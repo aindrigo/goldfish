@@ -67,17 +67,17 @@ end
 function goldfish.actor.SerializeOperation(buf, operation)
     buf:WriteByte(operation.type, true)
     buf:WriteString(operation.objectName)
-    buf:WriteInt(operation.objectIndex, true)
+    buf:WriteShort(operation.objectIndex, true)
 
     local op = operation.type
 
     if op == goldfish.actor.OperationType.VariableSet then
         buf:WriteString(operation.variableName)
-        buf:WriteAny(operation.value)
+        buf:Write(operation.value)
     elseif op == goldfish.actor.OperationType.VariableReset then
         buf:WriteString(operation.variableName)
     elseif op == goldfish.actor.OperationType.ObjectCreate then
-        buf:WriteTyped(operation.variables, serial.Types.TABLE)
+        buf:Write(operation.variables, serial.Types.TABLE)
     end
 end
 
@@ -86,14 +86,15 @@ end
 --- @return goldfish.actor.Operation
 function goldfish.actor.DeserializeOperation(buf)
     local op = buf:ReadByte(true)
-    local objectName, objectIndex = buf:ReadString(), buf:ReadInt(true)
+    local objectName = buf:ReadString()
+    local objectIndex = buf:ReadShort(true)
 
     if op == goldfish.actor.OperationType.VariableSet then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString(), buf:ReadAny())
+        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString(), buf:Read())
     elseif op == goldfish.actor.OperationType.VariableReset then
         return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString())
     elseif op == goldfish.actor.OperationType.ObjectCreate then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadTyped(serial.Types.TABLE))
+        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:Read(serial.Types.TABLE))
     elseif op == goldfish.actor.OperationType.ObjectDestroy then
         return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex)
     end
