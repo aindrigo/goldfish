@@ -27,19 +27,22 @@ function HOOKS:Think()
 
                 local key = goldfish.actor.ToString(name, index)
                 if object:HasObserver(ply) and not state.observing[key] then
-                    goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index, object:GetVariables()))
+                    goldfish.actor.SerializeOperation(data.buffer,
+                        goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index,
+                            object:GetVariables()))
                     data.operationCount = data.operationCount + 1
 
                     state.observing[key] = true
                     data.changedObservers[key] = true
                 elseif not object:HasObserver(ply) and state.observing[key] then
-                    goldfish.actor.SerializeOperation(data.buffer, goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
+                    goldfish.actor.SerializeOperation(data.buffer,
+                        goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
                     data.operationCount = data.operationCount + 1
 
                     state.observing[key] = nil
                     data.changedObservers[key] = true
                 end
-                
+
                 continue
             end
         end
@@ -101,9 +104,12 @@ end
 --- server-only, internal: builds an operation
 --- @param operation goldfish.actor.Operation
 function goldfish.actor.QueueOperation(operation)
-    local isVariableOp = operation.type == goldfish.actor.OperationType.VariableReset or operation.type == goldfish.actor.OperationType.VariableSet
+    local isVariableOp = operation.type == goldfish.actor.OperationType.VariableReset or
+    operation.type == goldfish.actor.OperationType.VariableSet
     for i = 1, #goldfish.actor.queue do
         local op = goldfish.actor.queue[i]
+        if op == nil then break end
+
         local isThisVariableOp = (op.type == goldfish.actor.OperationType.VariableReset or op.type == goldfish.actor.OperationType.VariableSet)
         if op.objectName == operation.objectName and op.objectIndex == operation.objectIndex then
             if isThisVariableOp and isVariableOp then
