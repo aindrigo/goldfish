@@ -28,6 +28,7 @@ end
 --- @return any value
 function actor_base:VariableGet(id, default)
     self.m_tVariables = self.m_tVariables or {}
+    self.m_tVariableData = self.m_tVariableData or {}
 
     local var = self.m_tVariables[id]
     assert(istable(var), "no such variable " .. id)
