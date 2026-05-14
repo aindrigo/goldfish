@@ -112,11 +112,9 @@ function goldfish.actor.QueueOperation(operation)
 
         local isThisVariableOp = (op.type == goldfish.actor.OperationType.VariableReset or op.type == goldfish.actor.OperationType.VariableSet)
         if op.objectName == operation.objectName and op.objectIndex == operation.objectIndex then
-            if isThisVariableOp and isVariableOp then
-                if variableName == operation.variableName then
-                    table.remove(goldfish.actor.queue, i)
-                    i = i - 1
-                end
+            if isThisVariableOp and isVariableOp and op.variableName == operation.variableName then
+                table.remove(goldfish.actor.queue, i)
+                i = i - 1
             elseif op.type == goldfish.actor.OperationType.ObjectCreate and isVariableOp then
                 if operation == goldfish.actor.OperationType.VariableReset then
                     op.variables[operation.variableName] = nil

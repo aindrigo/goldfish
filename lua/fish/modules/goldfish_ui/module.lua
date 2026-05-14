@@ -4,7 +4,8 @@ MODULE.Realm = fish.Realm.CLIENT
 function MODULE:PreEnable()
     goldfish.ui = {}
     goldfish.ui.textShadowColor = Color(10, 10, 10, 200)
-    goldfish.ui.blurMaterial = Material("pp/bokehblur")
+    goldfish.ui.blurMaterialExpensive = Material("pp/bokehblur")
+    goldfish.ui.blurMaterialCheap = Material("pp/blurscreen")
 
     goldfish.ui.fonts = {}
     goldfish.ui.scissorStack = {}

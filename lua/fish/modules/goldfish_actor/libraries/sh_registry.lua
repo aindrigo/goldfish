@@ -16,16 +16,7 @@ function goldfish.actor.Define(name, baseClass)
 
     prototype.metatable = {
         __index = function(_, key)
-            local prototype = goldfish.actor.registry[name]
-            if prototype[key] ~= nil then return prototype[key] end
-
-            if isstring(prototype.static.BaseClassName) then
-                local basePrototype = goldfish.actor.registry[prototype.static.BaseClassName]
-                if istable(basePrototype) then
-                    local value = basePrototype[key]
-                    return value
-                end
-            end
+            return goldfish.actor.registry[name][key]
         end,
         MetaName = name
     }
@@ -43,19 +34,36 @@ function goldfish.actor.Define(name, baseClass)
         goldfish.actor.objects[name] = nil
     end
 
-    function prototype:Construct() 
+    function prototype:Construct()
     end
 
-    setmetatable(prototype, {
-        __call = function(prototype, ...)
-            local inst = prototype.static:Get(...)
-            if IsValid(inst) then
-                return inst
-            end
+    prototype.static.metatable = {}
+    prototype.static.metatable.__index = function(_, key)
+        local prototype = goldfish.actor.registry[name]
+        local value = prototype[key]
 
-            return prototype.static:New(...)
+        if key == "BaseClass" then
+            return goldfish.actor.registry[prototype.static.BaseClassName]
         end
-    })
+
+        if value ~= nil then return value end
+
+        if isstring(prototype.static.BaseClassName) then
+            local base = goldfish.actor.registry[prototype.static.BaseClassName]
+            return base[key]
+        end
+    end
+
+    prototype.static.metatable.__call = function(prototype, ...)
+        local inst = prototype.static:Get(...)
+        if IsValid(inst) then
+            return inst
+        end
+
+        return prototype.static:New(...)
+    end
+
+    setmetatable(prototype, prototype.static.metatable)
 
     goldfish.actor.registry[name] = prototype
     goldfish.actor.objects[name] = {}

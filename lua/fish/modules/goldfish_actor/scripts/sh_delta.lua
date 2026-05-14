@@ -42,10 +42,11 @@ function goldfish.actor.BuildOperation(operation, observers, objectName, objectI
             ["variableName"] = variableName,
         }
     elseif operation == goldfish.actor.OperationType.ObjectCreate then
+        local variables = ...
         return {
             ["type"] = operation,
             ["observers"] = observers,
-            ["variables"] = ...,
+            ["variables"] = variables,
             ["objectName"] = objectName,
             ["objectIndex"] = objectIndex
         }
@@ -128,6 +129,9 @@ function goldfish.actor.PerformOperation(operation)
 
         object = goldfish.actor.Instantiate(operation.objectName, operation.objectIndex)
         object:SetVariables(operation.variables)
+        if isfunction(object.OnSpawn) then
+            object:OnSpawn()
+        end
     elseif op == goldfish.actor.OperationType.ObjectDestroy then
         if not IsValid(object) then
             return false, "tried to destroy non-existent object " .. tostring(operation.objectIndex)

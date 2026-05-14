@@ -19,31 +19,51 @@ function goldfish.ui.DrawRectOutline(x, y, w, h, thickness, color)
     surface.DrawOutlinedRect(x, y, w, h, thickness)
 end
 
+--- @enum goldfish.ui.BlurType
+goldfish.ui.BlurType = {
+    Cheap = 0,
+    Expensive = 1
+}
+
 --- @param x number
 --- @param y number
 --- @param w number
 --- @param h number
 --- @param intensity? number
---- @param distance? number
---- @param focus? number
-function goldfish.ui.DrawBlur(x, y, w, h, intensity, distance, focus)
+--- @param type? goldfish.ui.BlurType
+function goldfish.ui.DrawBlur(x, y, w, h, intensity, type)
+    intensity = intensity or 1
+    type = type or goldfish.ui.BlurType.Cheap
+
+    local ps = surface.GetPanelPaintState()
+    x = ps.translate_x + x
+    y = ps.translate_y + y
+
     goldfish.ui.PushScissor(x, y, x + w, y + h)
-        intensity = intensity or 6
-        distance = distance or 1
-        focus = focus or 2
+    render.UpdateScreenEffectTexture()
 
-        local mat = goldfish.ui.blurMaterial
+    local mat = nil
+    if type == goldfish.ui.BlurType.Cheap then
+        mat = goldfish.ui.blurMaterialCheap
 
-        render.UpdateScreenEffectTexture()
-        mat:SetTexture("$BASETEXTURE", render.GetScreenEffectTexture())
-    	mat:SetTexture("$DEPTHTEXTURE", render.GetResolvedFullFrameDepth())
+        mat:SetFloat("$blur", 5 * intensity)
+    elseif type == goldfish.ui.BlurType.Expensive then
+        mat = goldfish.ui.blurMaterialExpensive
 
-    	mat:SetFloat("$size", intensity)
-    	mat:SetFloat("$focus", distance)
-    	mat:SetFloat("$focusradius", focus)
+        mat:SetFloat("$size", 6 * intensity)
+        mat:SetFloat("$focus", 1)
+        mat:SetFloat("$focusradius", 2)
+    else
+        error("unrecognized type: " .. tostring(type))
+    end
 
-       	render.SetMaterial(mat)
-       	render.DrawScreenQuad()
+    mat:SetTexture("$BASETEXTURE", render.GetScreenEffectTexture())
+    mat:SetTexture("$DEPTHTEXTURE", render.GetResolvedFullFrameDepth())
+    mat:Recompute()
+
+    render.SetMaterial(mat)
+    render.DrawScreenQuad()
+
     goldfish.ui.PopScissor()
 end
 
@@ -51,16 +71,15 @@ end
 --- @param referenceWidth? number defaults to 640
 --- @return number scaled width
 function goldfish.ui.ScreenScaleW(w, referenceWidth)
-    return w * ( ScrW() / (referenceWidth or 640) )
+    return w * (ScrW() / (referenceWidth or 640))
 end
 
 --- @param h number height
 --- @param referenceHeight? number defaults to 480
 --- @return number scaled height
 function goldfish.ui.ScreenScaleH(h, referenceHeight)
-    return h * ( ScrH() / (referenceHeight or 480) )
+    return h * (ScrH() / (referenceHeight or 480))
 end
-
 
 --- @param w number width
 --- @param h number height
@@ -143,7 +162,7 @@ end
 function goldfish.ui.BeginRect(x, y, w, h)
     local matrix = Matrix()
     matrix:Translate(Vector(x, y, 0))
-    
+
     cam.PushModelMatrix(matrix, true)
     goldfish.ui.PushScissor(x, y, x + w, y + h)
 end

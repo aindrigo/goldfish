@@ -33,7 +33,7 @@ function actor_base:VariableSet(id, value)
             i = i - 1
         end
     end
-    
+
     if value ~= nil then
         assert(serial.GetType(value) == var.type, "mismatching type for variable " .. id)
         self:QueueOperation(goldfish.actor.OperationType.VariableSet, observers, id, value)
@@ -43,7 +43,6 @@ function actor_base:VariableSet(id, value)
 
     self:_VariableSet(id, value)
 end
-
 
 --- server-only: get observers, defined to be re-implemented if necessary
 --- @return table<Player> observers
@@ -78,4 +77,7 @@ function actor_base:Spawn()
     self:SetSpawned(true)
 
     self:QueueOperation(goldfish.actor.OperationType.ObjectCreate, self:GetObservers(), self:GetVariables())
+    if isfunction(self.OnSpawn) then
+        self:OnSpawn()
+    end
 end
