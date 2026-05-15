@@ -40,7 +40,7 @@ function goldfish.actor.Define(name, baseClass)
     prototype.static.metatable = {}
     prototype.static.metatable.__index = function(_, key)
         local prototype = goldfish.actor.registry[name]
-        local value = prototype[key]
+        local value = rawget( prototype, key )
 
         if key == "BaseClass" then
             return goldfish.actor.registry[prototype.static.BaseClassName]
