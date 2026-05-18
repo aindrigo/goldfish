@@ -1,10 +1,28 @@
 util.AddNetworkString("goldfish.actor.operations")
 
+net.Receive("goldfish.actor.operations", function(_, ply)
+    local operationCount = net.ReadUInt(16)
+    local len = net.ReadUInt(16)
+    local data = net.ReadData(len)
+
+    local cursor = 1
+    for _ = 1, operationCount do
+        local operation, size = goldfish.actor.DeserializeOperation(data, cursor)
+        cursor = cursor + size
+
+        local status, message = goldfish.actor.ClientCanPerform(ply, operation)
+        if not status then
+            print("player " .. ply:SteamID() .. " cannot perform operation: " .. message)
+        end
+
+        goldfish.actor.PerformOperation(operation)
+    end
+end)
 
 function HOOKS:Think()
     --- @class goldfish.actor.PlayerUpdateData
     --- @field operationCount number
-    --- @field buffer serial.Buffer
+    --- @field stream string
     --- @field changedObservers table<string, boolean>
 
     --- @type table<goldfish.actor.PlayerUpdateData>
@@ -20,23 +38,26 @@ function HOOKS:Think()
                 if not data then
                     data = {}
                     data.operationCount = 0
-                    data.buffer = serial.Buffer()
+                    data.stream = ""
                     data.changedObservers = {}
                     playerData[ply] = data
                 end
 
                 local key = goldfish.actor.ToString(name, index)
                 if object:HasObserver(ply) and not state.observing[key] then
-                    goldfish.actor.SerializeOperation(data.buffer,
-                        goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectCreate, {}, name, index,
+                    data.stream = data.stream ..
+                        goldfish.actor.SerializeOperation(goldfish.actor.BuildOperation(
+                            goldfish.actor.OperationType.ObjectCreate, {}, name, index,
                             object:GetVariables()))
+
                     data.operationCount = data.operationCount + 1
 
                     state.observing[key] = true
                     data.changedObservers[key] = true
                 elseif not object:HasObserver(ply) and state.observing[key] then
-                    goldfish.actor.SerializeOperation(data.buffer,
-                        goldfish.actor.BuildOperation(goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
+                    data.stream = data.stream ..
+                        goldfish.actor.SerializeOperation(goldfish.actor.BuildOperation(
+                            goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
                     data.operationCount = data.operationCount + 1
 
                     state.observing[key] = nil
@@ -48,40 +69,42 @@ function HOOKS:Think()
         end
     end
 
-    for _, operation in ipairs(goldfish.actor.queue) do
-        for _, ply in ipairs(operation.observers) do
-            if not IsValid(ply) then continue end
+    local queue = goldfish.actor.OptimizeOperations(goldfish.actor.queue)
+    goldfish.actor.queue = {}
 
-            local state = goldfish.actor.states[ply:UserID()]
-            if not istable(state) then continue end
+    if queue[1] ~= nil then
+        for _, operation in ipairs(queue) do
+            for _, ply in ipairs(operation.observers) do
+                if not IsValid(ply) then continue end
 
+                local state = goldfish.actor.states[ply:UserID()]
+                if not istable(state) then continue end
 
-            local data = playerData[ply]
-            if not data then
-                data = {}
-                data.operationCount = 0
-                data.buffer = serial.Buffer()
-                data.changedObservers = {}
+                local data = playerData[ply]
+                if not data then
+                    data = {}
+                    data.operationCount = 0
+                    data.stream = ""
+                    data.changedObservers = {}
 
-                playerData[ply] = data
+                    playerData[ply] = data
+                end
+
+                local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
+                if data.changedObservers[key] then continue end
+
+                data.stream = data.stream .. goldfish.actor.SerializeOperation(operation)
+                data.operationCount = data.operationCount + 1
             end
-
-            local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-            if data.changedObservers[key] then continue end
-
-            goldfish.actor.SerializeOperation(data.buffer, operation)
-            data.operationCount = data.operationCount + 1
         end
     end
-
-    goldfish.actor.queue = {}
 
     for ply, data in pairs(playerData) do
         if data.operationCount < 1 then continue end
         net.Start("goldfish.actor.operations")
-        net.WriteUInt(data.operationCount, 32)
+        net.WriteUInt(data.operationCount, 16)
 
-        local buf = data.buffer:GetData()
+        local buf = data.stream
         local len = #buf
 
         net.WriteUInt(len, 16)
@@ -101,38 +124,58 @@ function HOOKS:PlayerDisconnected(ply)
     goldfish.actor.states[ply:UserID()] = nil
 end
 
---- server-only, internal: builds an operation
---- @param operation goldfish.actor.Operation
-function goldfish.actor.QueueOperation(operation)
-    local isVariableOp = operation.type == goldfish.actor.OperationType.VariableReset or
-    operation.type == goldfish.actor.OperationType.VariableSet
-    for i = 1, #goldfish.actor.queue do
-        local op = goldfish.actor.queue[i]
-        if op == nil then break end
+--- server-only, internal: optimizes operation list
+--- @param operations table<goldfish.actor.Operation>
+--- @return table<goldfish.actor.Operation>
+function goldfish.actor.OptimizeOperations(operations)
+    if operations[1] == nil then return operations end
 
-        local isThisVariableOp = (op.type == goldfish.actor.OperationType.VariableReset or op.type == goldfish.actor.OperationType.VariableSet)
-        if op.objectName == operation.objectName and op.objectIndex == operation.objectIndex then
-            if isThisVariableOp and isVariableOp and op.variableName == operation.variableName then
-                table.remove(goldfish.actor.queue, i)
-                i = i - 1
-            elseif op.type == goldfish.actor.OperationType.ObjectCreate and isVariableOp then
-                if operation == goldfish.actor.OperationType.VariableReset then
-                    op.variables[operation.variableName] = nil
-                elseif operation == goldfish.actor.OperationType.VariableSet then
-                    op.variables[operation.variableName] = value
-                end
+    local newOperations = {}
+    local objectCreations = {}
 
-                return
-            elseif (operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy) and isThisVariableOp then
-                table.remove(goldfish.actor.queue, i)
-                i = i - 1
-            elseif operation.type == goldfish.actor.OperationType.ObjectDestroy and op.type == goldfish.actor.OperationType.ObjectCreate then
-                table.remove(goldfish.actor.queue, i)
-                i = i - 1
-                return
-            end
+    -- Iter 1: check for objects that are created or deleted
+    for _, operation in ipairs(operations) do
+        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
+        if operation.type == goldfish.actor.OperationType.ObjectCreate then
+            objectCreations[key] = true
+        elseif operation.type == goldfish.actor.OperationType.ObjectDestroy then
+            objectCreations[key] = false
         end
     end
 
-    table.insert(goldfish.actor.queue, operation)
+
+    local objectInsertIndices = {}
+    -- Iter 2: insert object creations/destructions
+    for _, operation in ipairs(operations) do
+        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
+        if not objectCreations[key] then
+            continue
+        end
+
+        if operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy then
+            objectInsertIndices[key] = table.insert(newOperations, operation)
+        end
+    end
+
+    -- Iter 3: insert the rest
+    for _, operation in ipairs(operations) do
+        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
+        if objectCreations[key] == false then
+            continue
+        end
+
+        if operation.type == goldfish.actor.OperationType.VariableSet or operation.type == goldfish.actor.OperationType.VariableReset then
+            local objectInsertIndex = objectInsertIndices[key]
+            if objectInsertIndex ~= nil then
+                local objectInsert = newOperations[objectInsertIndex]
+                objectInsert.variables[operation.variableName] = operation.value
+            else
+                table.insert(newOperations, operation)
+            end
+        elseif operation.type ~= goldfish.actor.OperationType.ObjectCreate and operation.type ~= goldfish.actor.OperationType.ObjectDestroy then
+            table.insert(newOperations, operation)
+        end
+    end
+
+    return newOperations
 end

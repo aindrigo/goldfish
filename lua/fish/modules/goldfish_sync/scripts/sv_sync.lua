@@ -1,4 +1,4 @@
---- @enum goldfish.sync.Flags
+--- @enum goldfish.sync.Flag
 goldfish.sync.Flags = {
     NONE = 0,
     PRIVATE = 1
@@ -11,7 +11,7 @@ function goldfish.sync.Reconcile(target)
 
     local dataCount = 0
     local data = {}
-    
+
     for index, entitySyncData in pairs(goldfish.sync.data) do
         local allVariables = entitySyncData.variables or {}
 
@@ -46,10 +46,9 @@ function goldfish.sync.Reconcile(target)
         net.WriteUInt(index, 16)
         net.WriteUInt(entityData.variableCount, 16)
         for variableId, value in pairs(entityData.variables) do
-            local variableData = goldfish.sync.variables[variableId]
             net.WriteUInt(variableId, 16)
 
-            local stream = serial.Serialize(value, variableData.type)
+            local stream = serial.SerializeSingle(value, goldfish.sync.serialSettings)
             local streamSize = #stream
 
             net.WriteUInt(streamSize, 16)

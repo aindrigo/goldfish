@@ -1,11 +1,11 @@
 --- @enum goldfish.config.OptionType
 goldfish.config.OptionType = {
-    NUMBER = serial.Types.NUMBER,
-    STRING = serial.Types.STRING,
-    BOOLEAN = serial.Types.BOOLEAN,
-    VECTOR = serial.Types.VECTOR,
-    ANGLES = serial.Types.ANGLES,
-    COLOR = serial.Types.COLOR
+    NUMBER = 0,
+    STRING = 1,
+    BOOLEAN = 2,
+    VECTOR = 3,
+    ANGLES = 4,
+    COLOR = 5
 }
 
 --- gets the goldfish.config.OptionType of a value

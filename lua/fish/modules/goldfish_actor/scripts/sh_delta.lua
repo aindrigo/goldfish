@@ -1,23 +1,13 @@
---- @enum goldfish.actor.OperationType
-goldfish.actor.OperationType = {
-    VariableSet = 0,
-    VariableReset = 1,
-
-    ObjectCreate = 2,
-    ObjectDestroy = 3
-}
-
-
 --- @class goldfish.actor.Operation
 --- @field objectName string
 --- @field objectIndex number
---- @field observers table<Player>
+--- @field observers? table<Player>
 --- @field type goldfish.actor.OperationType
 --- @field value? any
 --- @field variables? table<string, any>
 
 --- @param operation goldfish.actor.OperationType
---- @param observers table<Player>
+--- @param observers? table<Player>
 --- @param objectName string
 --- @param objectIndex number
 --- @return goldfish.actor.Operation
@@ -57,50 +47,47 @@ function goldfish.actor.BuildOperation(operation, observers, objectName, objectI
             ["objectName"] = objectName,
             ["objectIndex"] = objectIndex
         }
+    elseif operation == goldfish.actor.OperationType.RemoteProcedure then
+        local rpcName, rpcParameters = ...
+        return {
+            ["type"] = operation,
+            ["observers"] = observers,
+            ["objectName"] = objectName,
+            ["objectIndex"] = objectIndex,
+            ["rpcName"] = rpcName,
+            ["rpcParameters"] = rpcParameters
+        }
     end
 
     error("not supposed to be here")
 end
 
 --- internal: serializes goldfish.actor.Operation
---- @param buf serial.Buffer
 --- @param operation goldfish.actor.Operation
-function goldfish.actor.SerializeOperation(buf, operation)
-    buf:WriteByte(operation.type, true)
-    buf:WriteString(operation.objectName)
-    buf:WriteShort(operation.objectIndex, true)
+--- @return string stream
+function goldfish.actor.SerializeOperation(operation)
+    local observers = operation.observers
+    operation.observers = nil
 
-    local op = operation.type
+    local data = serial.SerializeSingle(operation, goldfish.actor.serialSettings)
+    operation.observers = observers
 
-    if op == goldfish.actor.OperationType.VariableSet then
-        buf:WriteString(operation.variableName)
-        buf:Write(operation.value)
-    elseif op == goldfish.actor.OperationType.VariableReset then
-        buf:WriteString(operation.variableName)
-    elseif op == goldfish.actor.OperationType.ObjectCreate then
-        buf:Write(operation.variables, serial.Types.TABLE)
-    end
+    return data
 end
 
 --- internal: deserializes a goldfish.actor.Operation
---- @param buf serial.Buffer
---- @return goldfish.actor.Operation
-function goldfish.actor.DeserializeOperation(buf)
-    local op = buf:ReadByte(true)
-    local objectName = buf:ReadString()
-    local objectIndex = buf:ReadShort(true)
-
-    if op == goldfish.actor.OperationType.VariableSet then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString(), buf:Read())
-    elseif op == goldfish.actor.OperationType.VariableReset then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:ReadString())
-    elseif op == goldfish.actor.OperationType.ObjectCreate then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex, buf:Read(serial.Types.TABLE))
-    elseif op == goldfish.actor.OperationType.ObjectDestroy then
-        return goldfish.actor.BuildOperation(op, {}, objectName, objectIndex)
+--- @param stream string
+--- @param cursor? number
+--- @return goldfish.actor.Operation operation
+--- @return number size
+function goldfish.actor.DeserializeOperation(stream, cursor)
+    local value, valueSize = serial.DeserializeSingle(stream, goldfish.actor.serialSettings, cursor)
+    if not istable(value) then
+        print(stream:sub(1, cursor), "p2:", stream:sub(cursor), value, cursor)
+        error("invalid operation data received")
     end
 
-    error("invalid operation type " .. tostring(op))
+    return value, valueSize
 end
 
 --- @param operation goldfish.actor.Operation
@@ -116,7 +103,7 @@ function goldfish.actor.PerformOperation(operation)
     local object = objects[operation.objectIndex]
     if op == goldfish.actor.OperationType.VariableSet then
         if not IsValid(object) then
-            return false, "no such object " .. tostring(operation.objectIndex)
+            return false, "no such object " .. goldfish.actor.ToString(operation.objectName, operation.objectIndex)
         end
 
         object:_VariableSet(operation.variableName, operation.value)
@@ -124,7 +111,7 @@ function goldfish.actor.PerformOperation(operation)
         object:_VariableSet(operation.variableName, nil)
     elseif op == goldfish.actor.OperationType.ObjectCreate then
         if IsValid(object) then
-            return false, "tried to duplicate object " .. tostring(operation.objectIndex)
+            return false, "tried to duplicate object " .. goldfish.actor.ToString(operation.objectName, operation.objectIndex)
         end
 
         object = goldfish.actor.Instantiate(operation.objectName, operation.objectIndex)
@@ -134,11 +121,43 @@ function goldfish.actor.PerformOperation(operation)
         end
     elseif op == goldfish.actor.OperationType.ObjectDestroy then
         if not IsValid(object) then
-            return false, "tried to destroy non-existent object " .. tostring(operation.objectIndex)
+            return false, "tried to destroy non-existent object " .. goldfish.actor.ToString(operation.objectName, operation.objectIndex)
         end
-
         object:_Destroy()
+    elseif op == goldfish.actor.OperationType.RemoteProcedureCall then
+        object:PerformRPC(op.rpcName, op.rpcParameters)
     end
 
     return true, ""
+end
+
+--- checks if the client can perform an operation type
+--- @param ply Player
+--- @param operation goldfish.actor.Operation
+--- @return boolean can execute
+--- @return string message
+function goldfish.actor.ClientCanPerform(ply, operation)
+    if operation.type ~= goldfish.actor.OperationType.RemoteProcedureCall then
+        return false, "cannot perform non-rpc"
+    end
+
+    if SERVER then
+        local obj = goldfish.actor.objects[operation.objectName][operation.objectIndex]
+        if IsValid(obj) and not obj:HasObserver(ply) then
+            return false, "player not observing object"
+        end
+    end
+
+    return true, ""
+end
+
+--- internal: queues an operation
+--- @param operation goldfish.actor.Operation
+function goldfish.actor.QueueOperation(operation)
+    if CLIENT then
+        local status, message = goldfish.actor.ClientCanPerform(ply, operation)
+        if not status then error(message) end
+    end
+
+    table.insert(goldfish.actor.queue, operation)
 end

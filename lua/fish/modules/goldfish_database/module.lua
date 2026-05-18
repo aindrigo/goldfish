@@ -3,6 +3,7 @@ MODULE.Realm = fish.Realm.SERVER
 
 function MODULE:PreEnable()
     goldfish.database = {}
+    goldfish.database.serialSettings = serial.Profile.PERSISTENCE
 end
 
 function MODULE:PostEnable()

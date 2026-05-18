@@ -15,7 +15,7 @@ function actor_base:IsValid()
 end
 
 --- @param id string
---- @param type serial.Types
+--- @param type goldfish.sync.VariableType
 --- @param default? any
 function actor_base:VariableDefine(id, type, default)
     self.m_tVariables = self.m_tVariables or {}
@@ -44,7 +44,6 @@ function actor_base:VariableGet(id, default)
 
     return value
 end
-
 
 --- internal: set the value of a variable
 --- @param id string

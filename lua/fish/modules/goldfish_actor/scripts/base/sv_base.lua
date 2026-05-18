@@ -35,7 +35,7 @@ function actor_base:VariableSet(id, value)
     end
 
     if value ~= nil then
-        assert(serial.GetType(value) == var.type, "mismatching type for variable " .. id)
+        assert(goldfish.sync.GetType(value) == var.type, "mismatching type for variable " .. id)
         self:QueueOperation(goldfish.actor.OperationType.VariableSet, observers, id, value)
     else
         self:QueueOperation(goldfish.actor.OperationType.VariableReset, observers, id)

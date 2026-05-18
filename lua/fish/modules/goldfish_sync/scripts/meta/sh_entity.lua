@@ -9,7 +9,7 @@ function fish.meta.Entity:SetSyncVar(id, value)
     local variable = goldfish.sync.variables[id]
 
     assert(istable(variable), "invalid variable type")
-    assert(value == nil or serial.GetType(value) == variable.type, "mismatching types")
+    assert(value == nil or goldfish.sync.GetType(value) == variable.type, "mismatching types")
 
     local entIndex = self:EntIndex()
 
@@ -35,7 +35,7 @@ function fish.meta.Entity:SetSyncVar(id, value)
             net.WriteUInt(entIndex, 16)
             net.WriteUInt(id --[[@as number]], 16)
 
-            local stream = serial.Serialize(value, variable.type)
+            local stream = serial.SerializeSingle(value, goldfish.sync.serialSettings)
             local streamSize = #stream
             net.WriteUInt(streamSize, 16)
             net.WriteData(stream, streamSize)

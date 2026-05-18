@@ -34,10 +34,10 @@ end
 function query:Reset()
     self._callbacks = {}
     self._coroutines = {}
-    
+
     self._selectors = nil
     self._values = nil
-    
+
     self._pool = nil
 end
 
@@ -84,7 +84,7 @@ function query:AddSelector(key, value, compareOperation)
 
     local memberType = pool:GetMemberType(key)
     if memberType == goldfish.database.MemberType.SERIALIZED then
-        value = serial.Serialize(value)
+        value = serial.SerializeSingle(value, goldfish.database.serialSettings)
     end
 
     table.insert(self._selectors, { key, value, compareOperation })
@@ -98,7 +98,7 @@ function query:AddValue(key, value)
 
     local memberType = pool:GetMemberType(key)
     if memberType == goldfish.database.MemberType.SERIALIZED then
-        value = serial.Serialize(value)
+        value = serial.SerializeSingle(value, goldfish.database.serialSettings)
     end
 
     table.insert(self._values, { key, value })
@@ -150,7 +150,6 @@ function query:Delete(pool)
     self:SetValues({})
 end
 
-
 --- submits this query to the driver
 --- @param driver? any
 function query:Submit(driver)
@@ -190,7 +189,7 @@ end
 --- @param message string
 function query:OnError(message)
     for _, callback in ipairs(self._callbacks) do
-        callback(self, false, message) 
+        callback(self, false, message)
     end
 
     for _, co in ipairs(self._coroutines) do
@@ -213,9 +212,9 @@ function query:OnFinish(queryResult)
             for key, value in pairs(result) do
                 local memberType = pool:GetMemberType(key)
                 if memberType == goldfish.database.MemberType.SERIALIZED then
-                    value = serial.Deserialize(value)
+                    value = serial.DeserializeSingle(value, goldfish.database.serialSettings)
                     result[key] = value
-                end            
+                end
             end
         end
     end
@@ -223,7 +222,7 @@ function query:OnFinish(queryResult)
     self:SetResult(queryResult)
 
     for _, callback in ipairs(self._callbacks) do
-        callback(self, true, queryResult) 
+        callback(self, true, queryResult)
     end
 
     for _, co in ipairs(self._coroutines) do

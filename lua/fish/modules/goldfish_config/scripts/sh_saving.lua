@@ -26,7 +26,7 @@ function goldfish.config.LoadNamespace(namespace, saveDirectory)
     if not file.Exists(dataFilePath, "GAME") then return end
 
     local stream = file.Read(dataFilePath, "GAME")
-    local optionValues = serial.Deserialize(stream, serial.Types.TABLE)
+    local optionValues = serial.DeserializeSingle(stream, goldfish.config.serialSettings)
 
     for id, value in pairs(optionValues) do
         local option = options[id]
@@ -66,7 +66,7 @@ function goldfish.config.SaveNamespace(namespace, saveDirectory)
 
     if table.IsEmpty(optionValues) then return end
 
-    local stream = serial.Serialize(optionValues, serial.Types.TABLE)
+    local stream = serial.SerializeSingle(optionValues, goldfish.config.serialSettings)
     file.Write(filePath, stream)
 end
 

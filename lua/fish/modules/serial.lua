@@ -4,656 +4,998 @@ This library is licensed under the GNU Lesser General Public License version 3.0
 See the bottom of the file for a full copy of the GNU Lesser General Public License version 3.0.
 ]]
 
--- BEGIN lua-struct (MIT License)
---[[
- * Copyright (c) 2015-2020 Iryont <https://github.com/iryont/lua-struct>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
-]]
+--- GLua MsgPack implementation
+local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
+local floor, frexp, ldexp, abs, huge = math.floor, math.frexp, math.ldexp, math.abs, math.huge
+local byte, char, sub, len, reverse = string.byte, string.char, string.sub, string.len, string.reverse
 
-local unpack = table.unpack or _G.unpack
-
-local struct = {}
-
-function struct.pack(format, ...)
-    local stream = {}
-    local vars = { ... }
-    local endianness = true
-
-    for i = 1, format:len() do
-        local opt = format:sub(i, i)
-
-        if opt == '<' then
-            endianness = true
-        elseif opt == '>' then
-            endianness = false
-        elseif opt:find('[bBhHiIlL]') then
-            local n = opt:find('[hH]') and 2 or opt:find('[iI]') and 4 or opt:find('[lL]') and 8 or 1
-            local val = tonumber(table.remove(vars, 1))
-
-            local bytes = {}
-            for j = 1, n do
-                table.insert(bytes, string.char(val % (2 ^ 8)))
-                val = math.floor(val / (2 ^ 8))
-            end
-
-            if not endianness then
-                table.insert(stream, string.reverse(table.concat(bytes)))
-            else
-                table.insert(stream, table.concat(bytes))
-            end
-        elseif opt:find('[fd]') then
-            local val = tonumber(table.remove(vars, 1))
-            local sign = 0
-
-            if val < 0 then
-                sign = 1
-                val = -val
-            end
-
-            local mantissa, exponent = math.frexp(val)
-            if val == 0 then
-                mantissa = 0
-                exponent = 0
-            else
-                mantissa = (mantissa * 2 - 1) * math.ldexp(0.5, (opt == 'd') and 53 or 24)
-                exponent = exponent + ((opt == 'd') and 1022 or 126)
-            end
-
-            local bytes = {}
-            if opt == 'd' then
-                val = mantissa
-                for i = 1, 6 do
-                    table.insert(bytes, string.char(math.floor(val) % (2 ^ 8)))
-                    val = math.floor(val / (2 ^ 8))
-                end
-            else
-                table.insert(bytes, string.char(math.floor(mantissa) % (2 ^ 8)))
-                val = math.floor(mantissa / (2 ^ 8))
-                table.insert(bytes, string.char(math.floor(val) % (2 ^ 8)))
-                val = math.floor(val / (2 ^ 8))
-            end
-
-            table.insert(bytes, string.char(math.floor(exponent * ((opt == 'd') and 16 or 128) + val) % (2 ^ 8)))
-            val = math.floor((exponent * ((opt == 'd') and 16 or 128) + val) / (2 ^ 8))
-            table.insert(bytes, string.char(math.floor(sign * 128 + val) % (2 ^ 8)))
-            val = math.floor((sign * 128 + val) / (2 ^ 8))
-
-            if not endianness then
-                table.insert(stream, string.reverse(table.concat(bytes)))
-            else
-                table.insert(stream, table.concat(bytes))
-            end
-        elseif opt == 's' then
-            table.insert(stream, tostring(table.remove(vars, 1)))
-            table.insert(stream, string.char(0))
-        elseif opt == 'c' then
-            local n = format:sub(i + 1):match('%d+')
-            local str = tostring(table.remove(vars, 1))
-            local len = tonumber(n)
-            if len <= 0 then
-                len = str:len()
-            end
-            if len - str:len() > 0 then
-                str = str .. string.rep(' ', len - str:len())
-            end
-            table.insert(stream, str:sub(1, len))
-            i = i + n:len()
-        end
-    end
-
-    return table.concat(stream)
-end
-
-function struct.unpack(format, stream, pos)
-    local vars = {}
-    local iterator = pos or 1
-    local endianness = true
-
-    for i = 1, format:len() do
-        local opt = format:sub(i, i)
-
-        if opt == '<' then
-            endianness = true
-        elseif opt == '>' then
-            endianness = false
-        elseif opt:find('[bBhHiIlL]') then
-            local n = opt:find('[hH]') and 2 or opt:find('[iI]') and 4 or opt:find('[lL]') and 8 or 1
-            local signed = opt:lower() == opt
-
-            local val = 0
-            for j = 1, n do
-                local byte = string.byte(stream:sub(iterator, iterator))
-                if endianness then
-                    val = val + byte * (2 ^ ((j - 1) * 8))
-                else
-                    val = val + byte * (2 ^ ((n - j) * 8))
-                end
-                iterator = iterator + 1
-            end
-
-            if signed and val >= 2 ^ (n * 8 - 1) then
-                val = val - 2 ^ (n * 8)
-            end
-
-            table.insert(vars, math.floor(val))
-        elseif opt:find('[fd]') then
-            local n = (opt == 'd') and 8 or 4
-            local x = stream:sub(iterator, iterator + n - 1)
-            iterator = iterator + n
-
-            if not endianness then
-                x = string.reverse(x)
-            end
-
-            local sign = 1
-            local mantissa = string.byte(x, (opt == 'd') and 7 or 3) % ((opt == 'd') and 16 or 128)
-            for i = n - 2, 1, -1 do
-                mantissa = mantissa * (2 ^ 8) + string.byte(x, i)
-            end
-
-            if string.byte(x, n) > 127 then
-                sign = -1
-            end
-
-            local exponent = (string.byte(x, n) % 128) * ((opt == 'd') and 16 or 2) +
-                math.floor(string.byte(x, n - 1) / ((opt == 'd') and 16 or 128))
-            if exponent == 0 then
-                table.insert(vars, 0.0)
-            else
-                mantissa = (math.ldexp(mantissa, (opt == 'd') and -52 or -23) + 1) * sign
-                table.insert(vars, math.ldexp(mantissa, exponent - ((opt == 'd') and 1023 or 127)))
-            end
-        elseif opt == 's' then
-            local bytes = {}
-            for j = iterator, stream:len() do
-                if stream:sub(j, j) == string.char(0) or stream:sub(j) == '' then
-                    break
-                end
-
-                table.insert(bytes, stream:sub(j, j))
-            end
-
-            local str = table.concat(bytes)
-            iterator = iterator + str:len() + 1
-            table.insert(vars, str)
-        elseif opt == 'c' then
-            local n = format:sub(i + 1):match('%d+')
-            local len = tonumber(n)
-            if len <= 0 then
-                len = table.remove(vars)
-            end
-
-            table.insert(vars, stream:sub(iterator, iterator + len - 1))
-            iterator = iterator + len
-            i = i + n:len()
-        end
-    end
-
-    return unpack(vars)
-end
-
--- END lua-struct
-
---#endregion
 local _serial = {}
+_serial.isLittleEndian = true
 
---#region types
---- @enum serial.Types
-_serial.Types = {
-    NIL = 0,
-    NUMBER = 1,
-    STRING = 2,
-    BOOLEAN = 3,
-    TABLE = 4,
-    COLOR = 5,
-    VECTOR = 6,
-    ANGLES = 7,
-    ENTITY = 8
+-- see https://msgpack.org
+-- or https://github.com/msgpack/msgpack/blob/master/spec.md
+local u8_ceiling = 2 ^ 8
+local u16_ceiling = 2 ^ 16
+local u32_ceiling = 2 ^ 32
+local u64_ceiling = 2 ^ 64
+
+local i8_ceiling = 2 ^ 7
+local i16_ceiling = 2 ^ 15
+local i32_ceiling = 2 ^ 31
+local i64_ceiling = 2 ^ 63
+
+local f32_ceiling = 3.4028235 * (10 ^ 38)
+local nan = 0 / 0
+
+--- @enum serial.Format
+_serial.Format = {
+    NIL = 0xC0,
+    BOOLEAN_FALSE = 0xC2,
+    BOOLEAN_TRUE = 0xC3,
+
+    FIXINT_POSITIVE = 0x00,
+    FIXINT_NEGATIVE = 0xE0,
+
+    UINT_8 = 0xCC,
+    UINT_16 = 0xCD,
+    UINT_32 = 0xCE,
+    UINT_64 = 0xCF,
+
+    INT_8 = 0xD0,
+    INT_16 = 0xD1,
+    INT_32 = 0xD2,
+    INT_64 = 0xD3,
+
+    FLOAT_32 = 0xCA,
+    FLOAT_64 = 0xCB,
+
+    FIXSTRING = 0xA0,
+    STRING_8 = 0xD9,
+    STRING_16 = 0xDA,
+    STRING_32 = 0xDB,
+
+    BINARY_8 = 0xC4,
+    BINARY_16 = 0xC5,
+    BINARY_32 = 0xC6,
+
+    FIXARRAY = 0x90,
+    ARRAY_16 = 0xDC,
+    ARRAY_32 = 0xDD,
+
+    FIXMAP = 0x80,
+    MAP_16 = 0xDE,
+    MAP_32 = 0xDF,
+
+    FIXEXT_1 = 0xD4,
+    FIXEXT_2 = 0xD5,
+    FIXEXT_4 = 0xD6,
+    FIXEXT_8 = 0xD7,
+    FIXEXT_16 = 0xD8,
+
+    EXT_8 = 0xC7,
+    EXT_16 = 0xC8,
+    EXT_32 = 0xC9
 }
 
-_serial.typeNames = {
-    ["number"] = _serial.Types.NUMBER,
-    ["string"] = _serial.Types.STRING,
-    ["table"] = _serial.Types.TABLE,
-    ["boolean"] = _serial.Types.BOOLEAN,
-    ["Color"] = _serial.Types.COLOR,
-    ["Vector"] = _serial.Types.VECTOR,
-    ["Angle"] = _serial.Types.ANGLES,
-    ["Entity"] = _serial.Types.ENTITY,
+--- @enum serial.Type
+_serial.Type = {
+    INTEGER = 0,
+    NIL = 1,
+    BOOLEAN = 2,
+    FLOAT = 3,
+    STRING = 4,
+    BINARY = 5,
+    ARRAY = 6,
+    MAP = 7,
+    EXTENSION = 8
 }
 
-function _serial.GetType(value)
-    if value == nil then
-        return _serial.Types.NIL
-    elseif IsColor(value) then
-        return _serial.Types.COLOR
+--- @enum serial.Option
+_serial.Option = {
+    None = 0,
+    --- Not technically msgpack-compliant but is cheaper on most systems. Use for non-persistent, performance-critical situations.
+    LittleEndian = 1,
+    --- Forces serialized floats to be double-precision/64-bit
+    ForceDoublePrecision = 2
+}
+
+--- @enum serial.Profile
+_serial.Profile = {
+    PERFORMANCE  = bor(_serial.Option.LittleEndian),
+    PERSISTENCE = _serial.Option.None
+}
+
+-- Packers
+_serial.packers = {}
+_serial.unpackers = {}
+
+function _serial.packers.Integer(signed, value, byteCount, swapEndianness)
+    if signed then
+        value = value + 2 ^ (byteCount * 8 - 1)
     end
-
-    return _serial.typeNames[type(value)]
-end
-
---#endregion
---#region serializers
-_serial.serializers = {}
-
-_serial.serializers[_serial.Types.NIL] = {
-    read = function() return nil, 0 end,
-    write = function() return "" end
-}
-
-local u8max = math.pow(2, 8)
-local u16max = math.pow(2, 16)
-local u32max = math.pow(2, 32)
-local u64max = math.pow(2, 64)
-_serial.serializers[_serial.Types.NUMBER] = {
-    read = function(stream)
-        local numberMeta = struct.unpack("B", stream, 1)
-        stream = string.sub(stream, 2, -1)
-
-        local numberType = bit.rshift(numberMeta, 1)
-        local unsigned = bit.band(numberMeta, 1) == 1
-
-        if numberType == 0 then
-            return struct.unpack("d", stream), 1 + 8
-        elseif numberType == 1 then
-            return struct.unpack(unsigned and "B" or "b", stream), 1 + 1
-        elseif numberType == 2 then
-            return struct.unpack(unsigned and "H" or "h", stream), 1 + 2
-        elseif numberType == 3 then
-            return struct.unpack(unsigned and "I" or "i", stream), 1 + 4
-        elseif numberType == 4 then
-            return struct.unpack(unsigned and "L" or "l", stream), 1 + 8
-        end
-
-        error("unknown number data")
-    end,
-    write = function(value)
-        local numberType = 0
-        local unsigned = false
-        if math.floor(value) == value then
-            unsigned = value >= 0
-            local absolute = value
-            if not unsigned then
-                absolute = -absolute * 2
-            end
-
-            if absolute < u8max then
-                numberType = 1
-            elseif absolute >= u8max and absolute < u16max then
-                numberType = 2
-            elseif absolute >= u16max and absolute < u32max then
-                numberType = 3
-            elseif absolute >= u32max and absolute < u64max then
-                numberType = 4
-            end
-        end
-
-        local numberMeta = bit.bor(bit.lshift(numberType, 1), unsigned and 1 or 0)
-        local stream = struct.pack("B", numberMeta)
-
-        if numberType == 0 then
-            stream = stream .. struct.pack("d", value)
-        elseif numberType == 1 then
-            stream = stream .. struct.pack(unsigned and "B" or "b", value)
-        elseif numberType == 2 then
-            stream = stream .. struct.pack(unsigned and "H" or "h", value)
-        elseif numberType == 3 then
-            stream = stream .. struct.pack(unsigned and "I" or "i", value)
-        elseif numberType == 4 then
-            stream = stream .. struct.pack(unsigned and "L" or "l", value)
-        end
-
-        return stream
-    end
-}
-
-_serial.serializers[_serial.Types.STRING] = {
-    read = function(stream)
-        local value = struct.unpack("s", stream, 1)
-        return value, string.len(value) + 1
-    end,
-    write = function(value)
-        return struct.pack("s", value)
-    end
-}
-
-_serial.serializers[_serial.Types.BOOLEAN] = {
-    read = function(stream)
-        local value = struct.unpack("B", stream, 1)
-        return value == 1, 1
-    end,
-    write = function(value)
-        return struct.pack("B", value and 1 or 0)
-    end
-}
-
-_serial.serializers[_serial.Types.TABLE] = {
-    read = function(stream)
-        local memberCount, memberCountSize = _serial.Deserialize(stream, _serial.Types.NUMBER)
-
-        local totalSize = memberCountSize
-        stream = string.sub(stream, 1 + memberCountSize, -1)
-
-        local result = {}
-        for _ = 1, memberCount do
-            local key, keySize = _serial.Deserialize(stream)
-            stream = string.sub(stream, 1 + keySize, -1)
-
-            local value, valueSize = _serial.Deserialize(stream)
-            stream = string.sub(stream, 1 + valueSize, -1)
-
-            totalSize = totalSize + keySize + valueSize
-            result[key] = value
-        end
-
-        return result, totalSize
-    end,
-    write = function(tbl)
-        local memberCount = 0
-        local stream = ""
-
-        for key, value in pairs(tbl) do
-            stream = stream .. _serial.Serialize(key) .. _serial.Serialize(value)
-            memberCount = memberCount + 1
-        end
-
-        stream = _serial.Serialize(memberCount, _serial.Types.NUMBER) .. stream
-        return stream
-    end
-}
-
-_serial.serializers[_serial.Types.COLOR] = {
-    read = function(stream)
-        local r, g, b, a = struct.unpack("BBBB", stream, 1)
-        stream = string.sub(stream, 5, -1)
-
-        return Color(r, g, b, a), 4
-    end,
-    write = function(value)
-        return struct.pack("BBBB", value.r, value.g, value.b, value.a)
-    end
-}
-
-local vectorSize = 8 * 3
-_serial.serializers[_serial.Types.VECTOR] = {
-    read = function(stream)
-        local x, y, z = struct.unpack("ddd", stream, 1)
-        stream = string.sub(stream, 1 + vectorSize, -1)
-
-        return Vector(x, y, z), vectorSize
-    end,
-    write = function(value)
-        return struct.pack("ddd", value.x, value.y, value.z)
-    end
-}
-
-_serial.serializers[_serial.Types.ANGLES] = {
-    read = function(stream)
-        local p, y, r = struct.unpack("ddd", stream, 1)
-        stream = string.sub(stream, 1 + vectorSize, -1)
-
-        return Angle(p, y, r), vectorSize
-    end,
-    write = function(value)
-        return struct.pack("ddd", value.p, value.y, value.r)
-    end
-}
-
-_serial.serializers[_serial.Types.ENTITY] = {
-    read = function(stream)
-        local index = struct.unpack("H", stream, 1)
-        return Entity(index), 2
-    end,
-    write = function(value)
-        return struct.pack("H", value:EntIndex())
-    end
-}
---- serializes a value
---- @param value any
---- @param typeId? serial.Types detected and embedded if not provided
---- @return string serialized value
-function _serial.Serialize(value, typeId)
-    local writeType = false
-    if not isnumber(typeId) then
-        writeType = true
-        typeId = _serial.GetType(value)
-    end
-
-    local serializer = _serial.serializers[typeId]
-    assert(istable(serializer), "cannot serialize type")
 
     local stream = ""
-    if writeType then
-        stream = stream .. struct.pack("B", typeId)
+
+    local loopStart, loopEnd, loopIncr = 1, byteCount, 1
+
+    if swapEndianness then
+        loopStart, loopEnd = loopEnd, loopStart
+        loopIncr = -1
     end
 
-    stream = stream .. serializer.write(value)
+    for _ = loopStart, loopEnd, loopIncr do
+        stream = stream .. char(value % 0x100)
+        value = floor(value / 0x100)
+    end
 
     return stream
 end
 
---- deserializes a value
---- @param stream string
---- @param typeId? serial.Types
---- @return any deserialized value
---- @return number length in stream
-function _serial.Deserialize(stream, typeId)
-    local length = 0
-    if not isnumber(typeId) then
-        typeId = struct.unpack("B", stream, 1)
-        assert(isnumber(typeId), "cannot deserialize")
+function _serial.unpackers.Integer(signed, stream, cursor, byteCount, swapEndianness)
+    local value = 0
+    for i = 1, byteCount do
+        local pos
+        if swapEndianness then
+            pos = byteCount - i
+        else
+            pos = i - 1
+        end
 
-        stream = string.sub(stream, 2, -1)
+        local b = byte(stream, cursor + pos)
+        value = value + (b * 2 ^ (pos * 8))
+    end
+
+    if signed then
+        local mask = 2 ^ (byteCount * 8 - 1)
+        if band(value, mask) then
+            value = value - mask
+        end
+    end
+
+    return value
+end
+
+function _serial.packers.Float(value, swapEndianness)
+    local sign = value < 0 and 0x80 or 0
+    value = abs(value)
+
+    local m, e = frexp(value)
+    local stream = ""
+
+    if m ~= m then
+        stream = stream .. char(0xFF, 0xF8, 0x00, 0x00)
+    elseif m == huge or e >= 128 then
+        stream = stream .. char(sign == 0 and 0x7F or 0xFF, 0x80, 0x00, 0x00)
+    elseif (m == 0 and e == 0) or e < -0x7E then
+        stream = stream .. char(sign, 0x00, 0x00, 0x00)
+    else
+        e = e + 0x7E
+        m = floor((m * 2.0 - 1.0) * ldexp(0.5, 24))
+        stream = stream ..
+            char(sign + floor(e * 0.5), (e % 2) * 0x80 + floor(m / 0x10000),
+                floor(m / 256) % 256, m % 256)
+    end
+
+    if swapEndianness then
+        stream = reverse(stream)
+    end
+    return stream
+end
+
+function _serial.unpackers.Float(stream, cursor, swapEndianness)
+    local value = 0
+    local b1, b2, b3, b4 = byte(stream, cursor, cursor + 4)
+    if swapEndianness then
+        b1, b2, b3, b4 = b4, b3, b2, b1
+    end
+
+    local sign = b1 > 0x7F and -1 or 1
+
+    local m = ((b2 % 0x80) * 0x100 + b3) * 0x100 + b4
+    local e = (b1 % 0x80) * 0x2 + floor(b2 / 0x80)
+
+    if m == 0 and e == 0 then
+        value = sign * 0
+    elseif expo == 0xFF then
+        if m == 0 then
+            value = huge * sign
+        else
+            value = nan
+        end
+    else
+        value = sign * ldexp(1.0 + m / 0x800000, e - 0x7F)
+    end
+
+    return value
+end
+
+function _serial.packers.Double(value, swapEndianness)
+    local sign = value < 0 and 0x80 or 0
+    value = abs(value)
+
+    local m, e = frexp(value)
+    local stream
+
+    if m ~= m then
+        stream = char(0xFF, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+    elseif m == huge or e >= 0x400 then
+        stream = char(sign == 0 and 0x7F or 0xFF, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+    elseif (m == 0 and e == 0) or e < -0x3FE then
+        stream = char(sign, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+    else
+        e = e + 0x3FE
+        m = floor((m * 2.0 - 1.0) * ldexp(0.5, 53))
+        stream = char(sign + floor(e / 0x10),
+            (e % 0x10) * 0x10 + floor(m / 0x1000000000000),
+            floor(m / 0x10000000000) % 0x100,
+            floor(m / 0x100000000) % 0x100,
+            floor(m / 0x1000000) % 0x100,
+            floor(m / 0x10000) % 0x100,
+            floor(m / 0x100) % 0x100,
+            m % 0x100
+        )
+    end
+
+    if swapEndianness then
+        stream = reverse(stream)
+    end
+
+    return stream
+end
+
+function _serial.unpackers.Double(stream, cursor, swapEndianness)
+    local value = 0
+
+    local b1, b2, b3, b4, b5, b6, b7, b8 = byte(stream, cursor, cursor + 8)
+    if swapEndianness then
+        b1, b2, b3, b4, b5, b6, b7, b8 = b8, b7, b6, b5, b4, b3, b2, b1
+    end
+
+    local sign = b1 > 0x7F and -1 or 1
+
+    local e = (b1 % 0x80) * 0x10 + floor(b2 / 0x10)
+    local m = ((((((b2 % 0x10) * 0x100 + b3) * 0x100 + b4) * 0x100 + b5) * 0x100 + b6) * 0x100 + b7) * 0x100 + b8
+
+    if m == 0 and e == 0 then
+        value = sign * 0
+    elseif e == 0x7FF then
+        if m == 0 then
+            value = huge * sign
+        else
+            value = nan
+        end
+    else
+        value = sign * ldexp(1.0 + m / 4503599627370496, e - 0x3FF)
+    end
+
+    return value
+end
+
+-- Encoders/decoders
+_serial.encoders = {}
+_serial.decoders = {}
+
+local intByteCounts = {
+    [_serial.Format.UINT_8] = 1,
+    [_serial.Format.INT_8] = 1,
+
+    [_serial.Format.UINT_16] = 2,
+    [_serial.Format.INT_16] = 2,
+
+    [_serial.Format.UINT_32] = 4,
+    [_serial.Format.INT_32] = 4,
+
+    [_serial.Format.UINT_64] = 8,
+    [_serial.Format.INT_64] = 8,
+}
+
+local intSigned = {
+    [_serial.Format.UINT_8] = false,
+    [_serial.Format.INT_8] = true,
+
+    [_serial.Format.UINT_16] = false,
+    [_serial.Format.INT_16] = true,
+
+    [_serial.Format.UINT_32] = false,
+    [_serial.Format.INT_32] = true,
+
+    [_serial.Format.UINT_64] = false,
+    [_serial.Format.INT_64] = true,
+}
+
+_serial.encoders[_serial.Type.INTEGER] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+    local format
+
+    if value < 0 then
+        local abs = -value
+
+        if abs < 32 then --5bit
+            format = _serial.Format.FIXINT_NEGATIVE
+        elseif abs < i8_ceiling then
+            format = _serial.Format.INT_8
+        elseif abs < i16_ceiling then
+            format = _serial.Format.INT_16
+        elseif abs < i32_ceiling then
+            format = _serial.Format.INT_32
+        elseif abs < i64_ceiling then
+            format = _serial.Format.INT_64
+        else
+            error("number too small")
+        end
+    else
+        if value < 128 then -- 7bit
+            format = _serial.Format.FIXINT_POSITIVE
+        elseif value < u8_ceiling then
+            format = _serial.Format.UINT_8
+        elseif value < u16_ceiling then
+            format = _serial.Format.UINT_16
+        elseif value < u32_ceiling then
+            format = _serial.Format.UINT_32
+        elseif value < u64_ceiling then
+            format = _serial.Format.UINT_64
+        else
+            error("number too large")
+        end
+    end
+
+    if format == _serial.Format.FIXINT_POSITIVE or format == _serial.Format.FIXINT_NEGATIVE then
+        return char(bor(abs(value), format))
+    end
+
+    local byteCount = intByteCounts[format]
+    if not isnumber(byteCount) then
+        error("unknown format " .. tostring(format))
+    end
+
+    return char(format) .. _serial.packers.Integer(intSigned[format], value, byteCount, swapEndianness)
+end
+
+_serial.decoders[_serial.Type.INTEGER] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    if format >= 0x00 and format <= 0x7F then     -- positive fixint limits
+        return band(format, 0x7F), 1
+    elseif format >= 0xE0 and format <= 0xFF then -- negative fixint limits
+        return -band(format, 0x1F), 1
+    end
+
+    local byteCount = intByteCounts[format]
+    if not isnumber(byteCount) then
+        error("unknown format " .. tostring(format))
+    end
+
+    local value = _serial.unpackers.Integer(intSigned[format], stream, cursor + 1, byteCount, swapEndianness)
+    return value, 1 + byteCount
+end
+
+_serial.encoders[_serial.Type.NIL] = function(value)
+    return char(_serial.Format.NIL)
+end
+
+_serial.decoders[_serial.Type.NIL] = function()
+    return nil, 1
+end
+
+_serial.encoders[_serial.Type.BOOLEAN] = function(value)
+    return char(value and _serial.Format.BOOLEAN_TRUE or _serial.Format.BOOLEAN_FALSE)
+end
+
+_serial.decoders[_serial.Type.BOOLEAN] = function(stream, format, cursor, options)
+    return format == _serial.Format.BOOLEAN_TRUE, 1
+end
+
+_serial.encoders[_serial.Type.FLOAT] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    if value < f32_ceiling and value < u64_ceiling and band(options, _serial.Option.ForceDoublePrecision) ~= _serial.Option.ForceDoublePrecision then
+        return char(_serial.Format.FLOAT_32) .. _serial.packers.Float(value, swapEndianness)
+    end
+
+    return char(_serial.Format.FLOAT_64) .. _serial.packers.Double(value, swapEndianness)
+end
+
+_serial.decoders[_serial.Type.FLOAT] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    if format == _serial.Format.FLOAT_64 then
+        return _serial.unpackers.Double(stream, cursor + 1, swapEndianness), 9
+    end
+
+    return _serial.unpackers.Float(stream, cursor + 1, swapEndianness), 5
+end
+
+_serial.encoders[_serial.Type.STRING] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local length = len(value)
+    if length < 32 then -- 5bit
+        return char(bor(_serial.Format.FIXSTRING, length)) .. value
+    elseif length < u8_ceiling then
+        return char(bor(_serial.Format.STRING_8)) ..
+            _serial.packers.Integer(false, length, 1, swapEndianness) .. value
+    elseif length < u16_ceiling then
+        return char(bor(_serial.Format.STRING_16)) ..
+            _serial.packers.Integer(false, length, 2, swapEndianness) .. value
+    elseif length < u32_ceiling then
+        return char(bor(_serial.Format.STRING_32)) ..
+            _serial.packers.Integer(false, length, 4, swapEndianness) .. value
+    else
+        error("string too large")
+    end
+end
+
+_serial.decoders[_serial.Type.STRING] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local byteCount = 0
+    local len = 0
+
+    cursor = cursor + 1
+    if (format >= 0xA0 and format <= 0xBF) then
+        len = band(0x1F, format)
+    else
+        if format == _serial.Format.STRING_8 then
+            byteCount = 1
+        elseif format == _serial.Format.STRING_16 then
+            byteCount = 2
+        elseif format == _serial.Format.STRING_32 then
+            byteCount = 4
+        else
+            error("unrecognized string format " .. tostring(format))
+        end
+
+        len = _serial.unpackers.Integer(false, stream, cursor, byteCount, swapEndianness)
+
+        cursor = cursor + byteCount
+    end
+
+    local value = sub(stream, cursor, cursor + len - 1)
+    return value, 1 + byteCount + len
+end
+
+_serial.encoders[_serial.Type.BINARY] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local length = len(value)
+    if length < u8_ceiling then
+        return char(bor(_serial.Format.BINARY_8)) .. _serial.packers.Integer(false, length, 1, swapEndianness)
+    elseif length < u16_ceiling then
+        return char(bor(_serial.Format.BINARY_16)) .. _serial.packers.Integer(false, length, 2, swapEndianness)
+    elseif length < u32_ceiling then
+        return char(bor(_serial.Format.BINARY_32)) .. _serial.packers.Integer(false, length, 4, swapEndianness)
+    else
+        error("binary data too large")
+    end
+end
+
+_serial.decoders[_serial.Type.BINARY] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    cursor = cursor + 1
+    local byteCount = 0
+
+    if format == _serial.Format.BINARY_16 then
+        byteCount = 2
+    elseif format == _serial.Format.BINARY_32 then
+        byteCount = 4
+    else
+        error("unknown format " .. tostring(format))
+    end
+
+    cursor = cursor + byteCount
+    local length = _serial.unpackers.Integer(stream, cursor, byteCount, swapEndianness)
+
+    local value = sub(stream, cursor, cursor + length)
+    return value, 1 + byteCount + length
+end
+
+_serial.encoders[_serial.Type.ARRAY] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local serialized = ""
+    local length = 0
+    for _, v in ipairs(value) do
+        serialized = serialized .. _serial.SerializeSingle(v, options)
         length = length + 1
     end
 
-    local serializer = _serial.serializers[typeId]
-    assert(istable(serializer), "cannot deserialize type")
-
-    local value, valueSize = serializer.read(stream)
-    return value, valueSize + length
+    if length < 16 then -- 4bit
+        return char(bor(_serial.Format.FIXARRAY, length)) .. serialized
+    elseif length < u16_ceiling then
+        return char(bor(_serial.Format.ARRAY_16)) ..
+            _serial.packers.Integer(false, length, 2, swapEndianness) .. serialized
+    elseif length < u32_ceiling then
+        return char(bor(_serial.Format.ARRAY_32)) ..
+            _serial.packers.Integer(false, length, 4, swapEndianness) .. serialized
+    else
+        error("array too large")
+    end
 end
 
---- serializes a custom type
---- @param value table<string, any>
---- @param typeData table<string, serial.Types> defines types of value
---- @return string serialized value
-function _serial.SerializeCustom(value, typeData)
-    local stream = ""
+_serial.decoders[_serial.Type.ARRAY] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
 
-    for key, typeId in SortedPairs(typeData) do
-        stream = stream .. _serial.Serialize(value[key], typeId)
+    local length = 0
+
+    local byteCount = 0
+    cursor = cursor + 1
+
+    if (format >= 0x90 and format <= 0x9F) then
+        length = band(0xF, format)
+    else
+        if format == _serial.Format.ARRAY_16 then
+            byteCount = 2
+        elseif format == _serial.Format.ARRAY_32 then
+            byteCount = 4
+        else
+            error("unknown format " .. format)
+        end
+
+        length = _serial.unpackers.Integer(false, stream, cursor, byteCount, swapEndianness)
+        cursor = cursor + byteCount
     end
 
-    return stream
-end
-
---- serializes a type
---- @param stream string
---- @param typeData table<string, serial.Types> defines types of value
---- @return table<string, any> deserialized value
---- @return number length
-function _serial.DeserializeCustom(stream, typeData)
-    local cursor = 1
-
-    local result = {}
-    for key, typeId in SortedPairs(typeData) do
-        local value, valueSize = _serial.Deserialize(string.sub(stream, cursor), typeId)
+    local arraySize = 0
+    local array = {}
+    for _ = 1, length do
+        local value, valueSize = _serial.DeserializeSingle(stream, options, cursor)
         cursor = cursor + valueSize
-        result[key] = value
+        arraySize = arraySize + valueSize
+
+        table.insert(array, value)
     end
 
-    return result, cursor - 1
+    return array, 1 + byteCount + arraySize
 end
 
---#endregion
---#region buffer
-local buffer = {}
 
-AccessorFunc(buffer, "_data", "Data", FORCE_STRING)
-AccessorFunc(buffer, "_cursor", "Cursor", FORCE_NUMBER)
-function buffer:New(source)
-    local instance = {}
-    setmetatable(instance, {
-        __index = buffer,
-        __tostring = function(_)
-            return string.format("%s: %p", "serial.Buffer", t)
-        end,
-        MetaName = "serial.Buffer"
-    })
+_serial.encoders[_serial.Type.MAP] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
 
-    instance:SetCursor(1)
-    instance:SetData(source or "")
-    return instance
-end
-
-function buffer:WriteStruct(value, typeName)
-    self._data = self._data .. struct.pack(typeName, value)
-end
-
-function buffer:ReadStruct(typeName)
-    local value = struct.unpack(typeName, self._data, self._cursor)
-    return value
-end
-
-function buffer:WriteString(value)
-    self:WriteStruct(value, "s")
-end
-
-function buffer:WriteBytes(value)
-    self._data = self._data .. value
-end
-
-function buffer:ReadBytes(length)
-    local value = string.sub(self._data, self._cursor, position)
-    self._cursor = self._cursor + length
-
-    return value
-end
-
-function buffer:ReadString()
-    local value = self:ReadStruct("s")
-    self._cursor = self._cursor + string.len(value) + 1 -- null-terminated
-    return value
-end
-
-function buffer:WriteByte(value, unsigned)
-    self:WriteStruct(value, unsigned and "B" or "b")
-end
-
-function buffer:ReadByte(unsigned)
-    local value = self:ReadStruct(unsigned and "B" or "b")
-    self._cursor = self._cursor + 1
-
-    return value
-end
-
-function buffer:WriteShort(value, unsigned)
-    self:WriteStruct(value, unsigned and "H" or "h")
-end
-
-function buffer:ReadShort(unsigned)
-    local value = self:ReadStruct(unsigned and "H" or "h")
-    self._cursor = self._cursor + 2
-    return value
-end
-
-function buffer:WriteInt(value, unsigned)
-    self:WriteStruct(value, unsigned and "I" or "i")
-end
-
-function buffer:ReadInt(unsigned)
-    local value = self:ReadStruct(unsigned and "I" or "i")
-    self._cursor = self._cursor + 4
-    return value
-end
-
-function buffer:WriteLong(value, unsigned)
-    self:WriteStruct(value, unsigned and "L" or "l")
-end
-
-function buffer:ReadLong(unsigned)
-    local value = self:ReadStruct(unsigned and "L" or "l")
-    self._cursor = self._cursor + 8
-    return value
-end
-
-function buffer:WriteFloat(value)
-    self:WriteStruct(value, "f")
-end
-
-function buffer:ReadFloat()
-    local value = self:ReadStruct("f")
-    self._cursor = self._cursor + 4
-    return value
-end
-
-function buffer:WriteDouble(value)
-    self:WriteStruct(value, "d")
-end
-
-function buffer:ReadDouble()
-    local value = self:ReadStruct("d")
-    self._cursor = self._cursor + 8
-    return value
-end
-
---- @param typeId? serial.Types see serial.Deserialize
-function buffer:Read(typeId)
-    local value, size = _serial.Deserialize(string.sub(self._data, self._cursor), typeId)
-    self._cursor = self._cursor + size
-
-    return value
-end
-
---- @param typeId? serial.Types see serial.Serialize
-function buffer:Write(value, typeId)
-    self._data = self._data .. _serial.Serialize(value, typeId)
-end
-
-setmetatable(buffer, {
-    __call = function(self, ...)
-        return buffer:New(...)
+    local serialized = ""
+    local length = 0
+    for k, v in pairs(value) do
+        serialized = serialized .. _serial.SerializeSingle(k, options) .. _serial.SerializeSingle(v, options)
+        length = length + 1
     end
-})
 
---- @class serial.Buffer
-_serial.Buffer = buffer
---#endregion
---#region gamemode implementation
+    if length < 16 then -- 4bit
+        return char(bor(_serial.Format.FIXMAP, length)) .. serialized
+    elseif length < u16_ceiling then
+        return char(bor(_serial.Format.MAP_16)) ..
+            _serial.packers.Integer(false, length, 2, swapEndianness) .. serialized
+    elseif length < u32_ceiling then
+        return char(bor(_serial.Format.MAP_32)) ..
+            _serial.packers.Integer(false, length, 4, swapEndianness) .. serialized
+    else
+        error("map too large")
+    end
+end
+
+_serial.decoders[_serial.Type.MAP] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local length = 0
+
+    local byteCount = 0
+    cursor = cursor + 1
+    if (format >= 0x80 and format <= 0x8F) then
+        length = band(0xF, format)
+    else
+        if format == _serial.Format.MAP_16 then
+            byteCount = 2
+        elseif format == _serial.Format.MAP_32 then
+            byteCount = 4
+        else
+            error("unknown format " .. format)
+        end
+
+        length = _serial.unpackers.Integer(false, stream, cursor, byteCount, swapEndianness)
+        cursor = cursor + byteCount
+    end
+
+    local mapSize = 0
+    local map = {}
+    for _ = 1, length do
+        local key, keySize = _serial.DeserializeSingle(stream, options, cursor)
+        cursor = cursor + keySize
+
+        local value, valueSize = _serial.DeserializeSingle(stream, options, cursor)
+        cursor = cursor + valueSize
+        mapSize = mapSize + keySize + valueSize
+
+        map[key] = value
+    end
+
+    return map, 1 + byteCount + mapSize
+end
+
+_serial.encoders[_serial.Type.EXTENSION] = function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+
+    local ext, extType
+    for i, v in pairs(_serial.extensionTypes) do
+        if v.check(value) then
+            ext = v
+            extType = i
+        end
+    end
+
+    assert(istable(ext), "no suitable extension type found for value " .. tostring(value))
+    value = ext.encode(value, options)
+
+    local length = len(value)
+    if length <= 16 then
+        if length <= 1 then
+            return char(_serial.Format.FIXEXT_1) .. _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+        elseif length <= 2 then
+            return char(_serial.Format.FIXEXT_2) .. _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+        elseif length <= 4 then
+            return char(_serial.Format.FIXEXT_4) .. _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+        elseif length <= 8 then
+            return char(_serial.Format.FIXEXT_8) .. _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+        elseif length <= 16 then
+            return char(_serial.Format.FIXEXT_16) .. _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+        end
+    elseif length < u8_ceiling then
+        return char(_serial.Format.EXT_8) ..
+            _serial.packers.Integer(false, length, 1, swapEndianness) ..
+            _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+    elseif length < u16_ceiling then
+        return char(_serial.Format.EXT_16) ..
+            _serial.packers.Integer(false, length, 2, swapEndianness) ..
+            _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+    elseif length < u32_ceiling then
+        return char(_serial.Format.EXT_32) ..
+            _serial.packers.Integer(false, length, 4, swapEndianness) ..
+            _serial.packers.Integer(true, extType, 1, swapEndianness) .. value
+    else
+        error("extension data too large")
+    end
+end
+
+_serial.decoders[_serial.Type.EXTENSION] = function(stream, format, cursor, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+    if format >= _serial.Format.FIXEXT_1 and format <= _serial.Format.FIXEXT_16 then
+        local type = _serial.unpackers.Integer(true, stream, cursor + 1, 1, swapEndianness)
+        local ext = _serial.extensionTypes[type]
+        assert(istable(ext), "no such extension type " .. type)
+
+        if format == _serial.Format.FIXEXT_1 then
+            return ext.decode(stream, cursor + 2, format, options), 3
+        elseif format == _serial.Format.FIXEXT_2 then
+            return ext.decode(stream, cursor + 2, format, options), 4
+        elseif format == _serial.Format.FIXEXT_4 then
+            return ext.decode(stream, cursor + 2, format, options), 6
+        elseif format == _serial.Format.FIXEXT_8 then
+            return ext.decode(stream, cursor + 2, format, options), 10
+        elseif format == _serial.Format.FIXEXT_16 then
+            return ext.decode(stream, cursor + 2, format, options), 18
+        end
+    end
+
+    local type, byteCount
+    if format == _serial.Format.EXT_8 then
+        type = _serial.unpackers.Integer(true, stream, cursor + 2, 1, swapEndianness)
+        byteCount = 1
+    elseif format == _serial.Format.EXT_16 then
+        type = _serial.unpackers.Integer(true, stream, cursor + 3, 1, swapEndianness)
+        byteCount = 2
+    elseif format == _serial.Format.EXT_32 then
+        type = _serial.unpackers.Integer(true, stream, cursor + 5, 1, swapEndianness)
+        byteCount = 4
+    end
+
+    local ext = _serial.extensionTypes[type]
+    assert(istable(ext), "no such extension type " .. type)
+
+    return ext.decode(stream, cursor + byteCount + 2, format, options), 2 + byteCount
+end
+
+-- Extensions
+
+--- Timestamp is a predefined extension type in the msgpack specification
+--- @class serial.Timestamp
+--- @field seconds number
+--- @field nanoseconds number
+
+--- @param seconds? number
+--- @param nanoseconds? number
+--- @return serial.Timestamp
+function _serial.MakeTimestamp(seconds, nanoseconds)
+    return { seconds = seconds or 0, nanoseconds = nanoseconds or 0, __serial_timestamp = true }
+end
+
+local timestamp_u30_ceiling = 2 ^ 30
+local timestamp_u34_ceiling = 2 ^ 34
+
+_serial.extensionTypes = {}
+_serial.extensionTypes[-1] = {
+    encode = function(value, options)
+        local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+            not _serial.isLittleEndian
+
+        if value.nanoseconds == 0 then
+            return _serial.packers.Integer(false, value.seconds, 4, swapEndianness)
+        elseif value.nanoseconds < timestamp_u30_ceiling and value.seconds < timestamp_u34_ceiling then
+            local c1 = value.nanoseconds
+            local c2 = value.seconds
+
+            return _serial.packers.Integer(false, lshift(c1, 2), 4, swapEndianness) ..
+                _serial.packers.Integer(false, c2, 4, swapEndianness)
+        elseif value.nanoseconds < u32_ceiling and value.seconds < u64_ceiling then
+            return _serial.packers.Integer(false, value.nanoseconds, 4, swapEndianness) ..
+                _serial.packers.Integer(false, value.seconds, 8, swapEndianness)
+        else
+            error("timestamp too large")
+        end
+    end,
+    decode = function(stream, cursor, format, options)
+        local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+            not _serial.isLittleEndian
+
+        if format == _serial.Format.FIXEXT_4 then
+            return _serial.MakeTimestamp(_serial.unpackers.Integer(false, stream, cursor, 4, swapEndianness))
+        elseif format == _serial.Format.FIXEXT_8 then
+            return _serial.MakeTimestamp(_serial.unpackers.Integer(false, stream, cursor + 4, 4, swapEndianness),
+                rshift(_serial.unpackers.Integer(false, stream, cursor, 4, swapEndianness), 2))
+        elseif format == _serial.Format.EXT_8 then
+            return _serial.MakeTimestamp(_serial.unpackers.Integer(false, stream, cursor + 4, 8, swapEndianness),
+                _serial.unpackers.Integer(false, stream, cursor, 4, swapEndianness))
+        else
+            error("invalid timestamp format")
+        end
+    end,
+    check = function(value) return istable(value) and value.__serial_timestamp end
+}
+
+
+-- Utility functions
+
+
+--- determines type of value
+--- @param value any
+--- @return serial.Type|string result message if error
+function _serial.DetermineType(value)
+    for _, ext in pairs(_serial.extensionTypes) do
+        if ext.check(value) then
+            return _serial.Type.EXTENSION
+        end
+    end
+
+    if isnumber(value) then
+        if floor(value) ~= value or abs(value * 2) >= u64_ceiling or value == nan or value == huge then
+            return _serial.Type.FLOAT
+        end
+
+        return _serial.Type.INTEGER
+    elseif value == nil then
+        return _serial.Type.NIL
+    elseif isbool(value) then
+        return _serial.Type.BOOLEAN
+    elseif isstring(value) then
+        return _serial.Type.STRING
+    elseif istable(value) then
+        if table.IsSequential(value) then
+            return _serial.Type.ARRAY
+        end
+
+        return _serial.Type.MAP
+    end
+
+    return "cannot determine type of value " .. tostring(value)
+end
+
+local integerFormats = {
+    [_serial.Format.UINT_8] = true,
+    [_serial.Format.UINT_16] = true,
+    [_serial.Format.UINT_32] = true,
+    [_serial.Format.UINT_64] = true,
+    [_serial.Format.INT_8] = true,
+    [_serial.Format.INT_16] = true,
+    [_serial.Format.INT_32] = true,
+    [_serial.Format.INT_64] = true,
+}
+
+--- @param format number
+--- @return serial.Type? type
+function _serial.FormatToType(format)
+    if (format >= 0x00 and format <= 0x7F) or (format >= 0xE0 and format <= 0xFF)
+        or integerFormats[format] then
+        return _serial.Type.INTEGER
+    elseif format == _serial.Format.NIL then
+        return _serial.Type.NIL
+    elseif format == _serial.Format.BOOLEAN_FALSE or format == _serial.Format.BOOLEAN_TRUE then
+        return _serial.Type.BOOLEAN
+    elseif format == _serial.Format.FLOAT_32 or format == _serial.Format.FLOAT_64 then
+        return _serial.Type.FLOAT
+    elseif (format >= 0xA0 and format <= 0xBF) or format == _serial.Format.STRING_8
+        or format == _serial.Format.STRING_16 or format == _serial.Format.STRING_32 then
+        return _serial.Type.STRING
+    elseif format == _serial.Format.BINARY_8 or format == _serial.Format.BINARY_16 or
+        format == _serial.Format.BINARY_32 then
+        return _serial.Type.BINARY
+    elseif (format >= 0x90 and format <= 0x9F) or format == _serial.Format.ARRAY_16
+        or format == _serial.Format.ARRAY_32 then
+        return _serial.Type.ARRAY
+    elseif (format >= 0x80 and format <= 0x8F) or format == _serial.Format.MAP_16
+        or format == _serial.Format.MAP_32 then
+        return _serial.Type.MAP
+    elseif (format >= 0xC7 and format <= 0xC9) or (format >= 0xD4 and format <= 0xD8) then
+        return _serial.Type.EXTENSION
+    end
+end
+
+--- @param stream string
+--- @return number stream format
+function _serial.GetFormat(stream)
+    return byte(stream, 1)
+end
+
+--- @param stream string
+--- @return serial.Type? stream type
+function _serial.GetType(stream)
+    return _serial.FormatToType(_serial.GetFormat(stream))
+end
+
+--- defines an extension type
+--- @param index number 0-127
+--- @param encoder fun(value: any, options: number): string
+--- @param decoder fun(stream: string, cursor: number, format: serial.Format, options: number): any
+--- @param checker fun(value: any): boolean
+function _serial.DefineExtensionType(index, encoder, decoder, checker)
+    _serial.extensionTypes[index] = { encode = encoder, decode = decoder, check = checker }
+end
+
+--- undefines an extension type
+--- @param index number 0-127
+function _serial.UndefineExtensionType(index)
+    _serial.extensionTypes[index] = nil
+end
+
+--- @param value any
+--- @param options? number serial.SerializerOptions bitflags. must be same on serializer/deserializer
+--- @param type? serial.Type
+--- @return string data
+function _serial.SerializeSingle(value, options, type)
+    if type == nil then
+        type = _serial.DetermineType(value)
+    end
+
+    if options == nil then
+        options = _serial.Option.None
+    end
+
+    local encoder = _serial.encoders[type]
+    return encoder(value, options)
+end
+
+--- @param stream string
+--- @param options? number serial.SerializerOptions bitflags, must be same on serializer/deserializer
+--- @param cursor? number
+--- @return any data
+--- @return number size size in stream
+function _serial.DeserializeSingle(stream, options, cursor)
+    cursor = cursor or 1
+    if options == nil then
+        options = _serial.Option.None
+    end
+
+    local format = byte(stream, cursor)
+    local type = _serial.FormatToType(format)
+    if not type then
+        error("invalid format " .. tostring(type) .. " (cannot convert to type)")
+    end
+
+
+    local decoder = _serial.decoders[type]
+    return decoder(stream, format, cursor, options or _serial.Option.None)
+end
+
+--- @param ... any
+--- @return string data
+function _serial.Serialize(...)
+    return _serial.SerializeSingle({ ... }, nil, _serial.Type.ARRAY)
+end
+
+--- @param stream string
+--- @param options? number
+--- @param cursor? number
+--- @return any ...
+--- @return number size size in stream
+function _serial.Deserialize(stream, options, cursor)
+    local value, size = _serial.DeserializeSingle(stream, options, cursor)
+    value[#value + 1] = size
+    return unpack(value)
+end
+
+-- GMod extensions
+
+--- Vector
+_serial.DefineExtensionType(0, function(value, options)
+    return _serial.SerializeSingle(value.x, options) ..
+        _serial.SerializeSingle(value.y, options) .. _serial.SerializeSingle(value.z, options)
+end, function(stream, cursor, format, options)
+    local x, xSize = _serial.DeserializeSingle(stream, options, cursor)
+    cursor = cursor + xSize
+    local y, ySize = _serial.DeserializeSingle(stream, options, cursor)
+    cursor = cursor + ySize
+    local z = _serial.DeserializeSingle(stream, options, cursor)
+
+    return Vector(x, y, z)
+end, function(value)
+    return isvector(value)
+end)
+
+--- Angle
+_serial.DefineExtensionType(1, function(value, options)
+    return _serial.SerializeSingle(value.p, options) ..
+        _serial.SerializeSingle(value.y, options) .. _serial.SerializeSingle(value.r, options)
+end, function(stream, cursor, format, options)
+    local p, pSize = _serial.DeserializeSingle(stream, options, cursor)
+    cursor = cursor + pSize
+    local y, ySize = _serial.DeserializeSingle(stream, options, cursor)
+    cursor = cursor + ySize
+    local r = _serial.DeserializeSingle(stream, options, cursor)
+
+    return Angle(p, y, r)
+end, function(value)
+    return isangle(value)
+end)
+
+--- Color
+_serial.DefineExtensionType(2, function(value, options)
+    return _serial.packers.Integer(false, value.r, 1) ..
+        _serial.packers.Integer(false, value.g, 1) ..
+        _serial.packers.Integer(false, value.b, 1) .. _serial.packers.Integer(false, value.a, 1)
+end, function(stream, cursor, format, options)
+    return Color(_serial.unpackers.Integer(false, stream, cursor, 1),
+        _serial.unpackers.Integer(false, stream, cursor + 1, 1),
+        _serial.unpackers.Integer(false, stream, cursor + 2, 1),
+        _serial.unpackers.Integer(false, stream, cursor + 3, 1))
+end, function(value)
+    return IsColor(value)
+end)
+
+--- Entity
+_serial.DefineExtensionType(3, function(value, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+    return _serial.packers.Integer(false, value:EntIndex(), 2, swapEndianness)
+end, function(stream, cursor, format, options)
+    local swapEndianness = band(options, _serial.Option.LittleEndian) ~= _serial.Option.LittleEndian and
+        _serial.isLittleEndian
+    return Entity(_serial.unpackers.Integer(false, stream, cursor, 2, swapEndianness))
+end, function(value)
+    return isentity(value)
+end)
+
+--- Use this as a base index for defining your own extension types
+_serial.UserExtensionTypeStart = 16
+
 function MODULE:PreEnable()
     _G["serial"] = _serial
 end
 
-function MODULE:PreReload()
+function MODULE:PostDisable()
     _G["serial"] = _serial
 end
 
-function MODULE:PostDisable()
-    _G["serial"] = nil
-end
-
---#endregion
-
-
--- BEGIN GNU LESSER GENERAL PUBLIC LICENSE v3.0
 --[[
                    GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
@@ -821,4 +1163,3 @@ apply, that proxy's public statement of acceptance of any version is
 permanent authorization for you to choose that version for the
 Library.
 ]] --
--- END GNU LESSER GENERAL PUBLIC LICENSE v3.0

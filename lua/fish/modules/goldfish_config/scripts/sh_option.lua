@@ -124,8 +124,8 @@ end
 function option:_NetWrite()
     net.WriteString(self:GetNamespace())
     net.WriteString(self:GetId())
-    
-    local data = serial.Serialize(self:GetValue(), self:GetType())
+
+    local data = serial.SerializeSingle(self:GetValue(), goldfish.config.serialSettings)
     local dataLength = #data
 
     net.WriteUInt(dataLength, 16)
@@ -170,9 +170,10 @@ function option.static:_NetRead(sender)
     local length = net.ReadUInt(16)
     local data = net.ReadData(length)
 
-    local value = serial.Deserialize(data, option:GetType())
+    local value = serial.DeserializeSingle(data, goldfish.config.serialSettings)
     if value == nil then return end
-    
+
     option:_SetValue(value, sender)
 end
+
 goldfish.config.Option = option
