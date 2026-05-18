@@ -7,11 +7,11 @@
 --- @field variables? table<string, any>
 
 --- @param operation goldfish.actor.OperationType
---- @param observers? table<Player>
 --- @param objectName string
 --- @param objectIndex number
+--- @param observers? table<Player>
 --- @return goldfish.actor.Operation
-function goldfish.actor.BuildOperation(operation, observers, objectName, objectIndex, ...)
+function goldfish.actor.BuildOperation(operation, objectName, objectIndex, observers, ...)
     if operation == goldfish.actor.OperationType.VariableSet then
         local variableName, value = ...
         return {
@@ -125,7 +125,7 @@ function goldfish.actor.PerformOperation(operation)
         end
         object:_Destroy()
     elseif op == goldfish.actor.OperationType.RemoteProcedureCall then
-        object:PerformRPC(op.rpcName, op.rpcParameters)
+        object:_PerformRPC(op.rpcName, op.rpcParameters)
     end
 
     return true, ""

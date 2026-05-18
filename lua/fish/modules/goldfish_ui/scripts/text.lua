@@ -35,7 +35,7 @@ function goldfish.ui.Font(properties)
 
     properties.flags = flags
 
-    if bit.band(flags, goldfish.ui.FontFlags.Shadow) == goldfish.ui.FontFlags.Shadow then
+    if bit.band(flags, goldfish.ui.FontFlag.Shadow) == goldfish.ui.FontFlag.Shadow then
         local oldBlurSize = properties.blursize
 
         properties.blursize = properties.shadowsize or 4
@@ -44,7 +44,7 @@ function goldfish.ui.Font(properties)
         properties.blursize = oldBlurSize
     end
 
-    if bit.band(flags, goldfish.ui.FontFlags.Glow) == goldfish.ui.FontFlags.Glow then
+    if bit.band(flags, goldfish.ui.FontFlag.Glow) == goldfish.ui.FontFlag.Glow then
         local oldBlurSize = properties.blursize
 
         properties.blursize = properties.glowsize or 16
@@ -85,7 +85,7 @@ function goldfish.ui.DrawText(text, x, y, font, alignmentX, alignmentY, color)
         y = y - (textSizeH / 2)
     end
 
-    if bit.band(fontProperties.flags, goldfish.ui.FontFlags.Shadow) == goldfish.ui.FontFlags.Shadow then
+    if bit.band(fontProperties.flags, goldfish.ui.FontFlag.Shadow) == goldfish.ui.FontFlag.Shadow then
         local shadowX = x + 2
         local shadowY = y + 2
         surface.SetFont(font .. "-shadow")
@@ -94,7 +94,7 @@ function goldfish.ui.DrawText(text, x, y, font, alignmentX, alignmentY, color)
         surface.DrawText(text)
     end
 
-    if bit.band(fontProperties.flags, goldfish.ui.FontFlags.Glow) == goldfish.ui.FontFlags.Glow then
+    if bit.band(fontProperties.flags, goldfish.ui.FontFlag.Glow) == goldfish.ui.FontFlag.Glow then
         surface.SetFont(font .. "-glow")
         surface.SetTextPos(x, y)
         surface.SetTextColor(color or color_white)

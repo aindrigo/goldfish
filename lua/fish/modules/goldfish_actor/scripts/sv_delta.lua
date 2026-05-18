@@ -12,7 +12,7 @@ net.Receive("goldfish.actor.operations", function(_, ply)
 
         local status, message = goldfish.actor.ClientCanPerform(ply, operation)
         if not status then
-            print("player " .. ply:SteamID() .. " cannot perform operation: " .. message)
+            print("player " .. ply:SteamID() .. " tried to perform operation: " .. message)
         end
 
         goldfish.actor.PerformOperation(operation)
