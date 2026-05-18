@@ -47,7 +47,7 @@ function goldfish.actor.BuildOperation(operation, objectName, objectIndex, obser
             ["objectName"] = objectName,
             ["objectIndex"] = objectIndex
         }
-    elseif operation == goldfish.actor.OperationType.RemoteProcedure then
+    elseif operation == goldfish.actor.OperationType.RemoteProcedureCall then
         local rpcName, rpcParameters = ...
         return {
             ["type"] = operation,
@@ -97,7 +97,7 @@ function goldfish.actor.PerformOperation(operation)
 
     local objects = goldfish.actor.objects[operation.objectName]
     if not istable(objects) then
-        return false, "no registry objects with name " .. operation.objectName
+        return false, "no registry objects with name " .. tostring(operation.objectName)
     end
 
     local object = objects[operation.objectIndex]
@@ -125,7 +125,7 @@ function goldfish.actor.PerformOperation(operation)
         end
         object:_Destroy()
     elseif op == goldfish.actor.OperationType.RemoteProcedureCall then
-        object:_PerformRPC(op.rpcName, op.rpcParameters)
+        object:_PerformRPC(operation.rpcName, operation.rpcParameters)
     end
 
     return true, ""

@@ -47,7 +47,7 @@ function HOOKS:Think()
                 if object:HasObserver(ply) and not state.observing[key] then
                     data.stream = data.stream ..
                         goldfish.actor.SerializeOperation(goldfish.actor.BuildOperation(
-                            goldfish.actor.OperationType.ObjectCreate, {}, name, index,
+                            goldfish.actor.OperationType.ObjectCreate, name, index, nil,
                             object:GetVariables()))
 
                     data.operationCount = data.operationCount + 1
@@ -57,7 +57,7 @@ function HOOKS:Think()
                 elseif not object:HasObserver(ply) and state.observing[key] then
                     data.stream = data.stream ..
                         goldfish.actor.SerializeOperation(goldfish.actor.BuildOperation(
-                            goldfish.actor.OperationType.ObjectDestroy, {}, name, index))
+                            goldfish.actor.OperationType.ObjectDestroy, name, index, nil))
                     data.operationCount = data.operationCount + 1
 
                     state.observing[key] = nil
