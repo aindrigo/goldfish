@@ -91,8 +91,16 @@ function goldfish.actor.DeserializeOperation(stream, cursor)
 end
 
 --- @param operation goldfish.actor.Operation
+--- @param ply? Player server-only
 --- @return boolean, string success or error
-function goldfish.actor.PerformOperation(operation)
+function goldfish.actor.PerformOperation(operation, ply)
+    if SERVER and IsValid(ply) then
+        local status, message = goldfish.actor.ClientCanPerform(ply, operation)
+        if not status then
+            print("player " .. ply:SteamID() .. " tried to perform operation: " .. message)
+        end
+    end
+
     local op = operation.type
 
     local objects = goldfish.actor.objects[operation.objectName]
@@ -125,7 +133,11 @@ function goldfish.actor.PerformOperation(operation)
         end
         object:_Destroy()
     elseif op == goldfish.actor.OperationType.RemoteProcedureCall then
-        object:_PerformRPC(operation.rpcName, operation.rpcParameters)
+        if SERVER then
+            object:_PerformRPC(ply, operation.rpcName, operation.rpcParameters)
+        else
+            object:_PerformRPC(operation.rpcName, operation.rpcParameters)
+        end
     end
 
     return true, ""

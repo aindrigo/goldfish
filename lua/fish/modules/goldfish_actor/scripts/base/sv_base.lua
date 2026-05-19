@@ -93,7 +93,7 @@ function actor_base:On(name, callback)
     table.insert(events, callback)
 end
 
-function actor_base:_PerformRPC(name, parameters)
+function actor_base:_PerformRPC(ply, name, parameters)
     local events = self._rpcEvents
     if not istable(events) then return end
 
@@ -101,6 +101,6 @@ function actor_base:_PerformRPC(name, parameters)
     if not list then return end
 
     for _, callback in ipairs(list) do
-        callback(self, unpack(parameters))
+        callback(self, ply, unpack(parameters))
     end
 end

@@ -16,3 +16,26 @@ end
 function actor_base:Trigger(name, ...)
     self:QueueOperation(goldfish.actor.OperationType.RemoteProcedureCall, name, { ... })
 end
+
+function actor_base:On(name, callback)
+    self._rpcEvents = self._rpcEvents or {}
+    local events = self._rpcEvents[name]
+    if not events then
+        events = {}
+        self._rpcEvents[name] = events
+    end
+
+    table.insert(events, callback)
+end
+
+function actor_base:_PerformRPC(name, parameters)
+    local events = self._rpcEvents
+    if not istable(events) then return end
+
+    local list = events[name]
+    if not list then return end
+
+    for _, callback in ipairs(list) do
+        callback(self, unpack(parameters))
+    end
+end
