@@ -19,11 +19,6 @@ function goldfish.ui.DrawRectOutline(x, y, w, h, thickness, color)
     surface.DrawOutlinedRect(x, y, w, h, thickness)
 end
 
---- @enum goldfish.ui.BlurType
-goldfish.ui.BlurType = {
-    Cheap = 0,
-    Expensive = 1
-}
 
 --- @param x number
 --- @param y number
@@ -33,7 +28,7 @@ goldfish.ui.BlurType = {
 --- @param type? goldfish.ui.BlurType
 function goldfish.ui.DrawBlur(x, y, w, h, intensity, type)
     intensity = intensity or 1
-    type = type or goldfish.ui.BlurType.Cheap
+    type = type or goldfish.ui.BlurType.CHEAP
 
     local ps = surface.GetPanelPaintState()
     x = ps.translate_x + x
@@ -43,11 +38,11 @@ function goldfish.ui.DrawBlur(x, y, w, h, intensity, type)
     render.UpdateScreenEffectTexture()
 
     local mat = nil
-    if type == goldfish.ui.BlurType.Cheap then
+    if type == goldfish.ui.BlurType.CHEAP then
         mat = goldfish.ui.blurMaterialCheap
 
         mat:SetFloat("$blur", 5 * intensity)
-    elseif type == goldfish.ui.BlurType.Expensive then
+    elseif type == goldfish.ui.BlurType.EXPENSIVE then
         mat = goldfish.ui.blurMaterialExpensive
 
         mat:SetFloat("$size", 6 * intensity)
@@ -135,4 +130,35 @@ end
 function goldfish.ui.EndRect()
     goldfish.ui.PopScissor()
     cam.PopModelMatrix()
+end
+
+--- draws a line similarly to surface.DrawLine but with thickness
+--- @param xStart number
+---@param yStart number
+---@param xEnd number
+---@param yEnd number
+---@param thickness number
+function goldfish.ui.DrawLine(xStart, yStart, xEnd, yEnd, thickness)
+    thickness = thickness or 1
+
+    if xEnd < xStart then
+        local originalXStart = xStart
+        xStart = xEnd
+        xEnd = originalXStart
+    end
+
+    if yEnd < yStart then
+        local originalYStart = yStart
+        yStart = yEnd
+        yEnd = originalYStart
+    end
+
+    local halfThickness = thickness / 2
+
+    local v0 = { x = xStart - halfThickness, y = yStart - halfThickness }
+    local v1 = { x = xEnd + halfThickness, y = yStart - halfThickness }
+    local v2 = { x = xEnd + halfThickness, y = yEnd + halfThickness }
+    local v3 = { x = xStart - halfThickness, y = yEnd + halfThickness }
+
+    surface.DrawPoly({ v0, v1, v2, v3 })
 end

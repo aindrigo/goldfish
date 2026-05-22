@@ -1,7 +1,13 @@
 
+--- @enum goldfish.ui.BlurType
+goldfish.ui.BlurType = {
+    CHEAP = 0,
+    EXPENSIVE = 1
+}
+
 --- @enum
 goldfish.ui.FontFlag = {
-    Default = 0,
-    Shadow = 1,
-    Glow = 2
+    DEFAULT = 0,
+    SHADOW = 1,
+    GLOW = 2
 }
