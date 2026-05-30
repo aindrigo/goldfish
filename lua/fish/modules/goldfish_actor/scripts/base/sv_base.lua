@@ -35,7 +35,7 @@ function actor_base:VariableSet(id, value)
     end
 
     if value ~= nil then
-        assert(goldfish.sync.GetType(value) == var.type, "mismatching type for variable " .. id)
+        assert(goldfish.sync.GetType(value) == var.type, "mismatching type for variable " .. id )
         self:QueueOperation(goldfish.actor.OperationType.VariableSet, observers, id, value)
     else
         self:QueueOperation(goldfish.actor.OperationType.VariableReset, observers, id)
@@ -82,15 +82,19 @@ function actor_base:Spawn()
     end
 end
 
-function actor_base:On(name, callback)
+function actor_base:Trigger(name, ...)
+    self:QueueOperation(goldfish.actor.OperationType.RemoteProcedureCall, self:GetObservers(), name, { ... })
+end
+
+function actor_base:On(eventName, eventID, callback)
     self._rpcEvents = self._rpcEvents or {}
-    local events = self._rpcEvents[name]
+    local events = self._rpcEvents[eventName]
     if not events then
         events = {}
-        self._rpcEvents[name] = events
+        self._rpcEvents[eventName] = events
     end
 
-    table.insert(events, callback)
+    events[eventID] = callback
 end
 
 function actor_base:_PerformRPC(ply, name, parameters)
@@ -100,7 +104,7 @@ function actor_base:_PerformRPC(ply, name, parameters)
     local list = events[name]
     if not list then return end
 
-    for _, callback in ipairs(list) do
+    for _, callback in pairs(list) do
         callback(self, ply, unpack(parameters))
     end
 end

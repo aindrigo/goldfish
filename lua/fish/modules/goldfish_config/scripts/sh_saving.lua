@@ -50,7 +50,7 @@ end
 function goldfish.config.SaveNamespace(namespace, saveDirectory)
     saveDirectory = saveDirectory or goldfish.config.saveDirectory
 
-    local filePath = string.format("%s/%s.bin", saveDirectory, namespace)
+    local filePath = string.format("%s/%s.dat", saveDirectory, namespace)
     local optionValues = {}
 
     for id, option in pairs(goldfish.config.options[namespace]) do
