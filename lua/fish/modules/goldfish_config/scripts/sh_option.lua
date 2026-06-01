@@ -141,8 +141,11 @@ function option:Sync(target)
     if CLIENT then
         net.SendToServer()
     else
-        target = target or player.GetAll()
-        net.Send(target)
+        if target then
+            net.Send( target )
+        else
+            net.Broadcast()
+        end
     end
 end
 

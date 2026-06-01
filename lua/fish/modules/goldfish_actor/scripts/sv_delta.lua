@@ -64,7 +64,7 @@ function HOOKS:Think()
         end
     end
 
-    local queue = goldfish.actor.OptimizeOperations(goldfish.actor.queue)
+    local queue = goldfish.actor.queue -- goldfish.actor.OptimizeOperations(goldfish.actor.queue)
     goldfish.actor.queue = {}
 
     if queue[1] ~= nil then
@@ -143,7 +143,7 @@ function goldfish.actor.OptimizeOperations(operations)
     -- Iter 2: insert object creations/destructions
     for _, operation in ipairs(operations) do
         local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-        if not objectCreations[key] then
+        if objectCreations[key] == nil then
             continue
         end
 
@@ -155,7 +155,7 @@ function goldfish.actor.OptimizeOperations(operations)
     -- Iter 3: insert the rest
     for _, operation in ipairs(operations) do
         local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-        if objectCreations[key] == false then
+        if objectCreations[key] == false and operation.type ~= goldfish.actor.OperationType.RemoteProcedureCall then
             continue
         end
 

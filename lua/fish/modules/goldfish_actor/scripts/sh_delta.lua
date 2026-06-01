@@ -122,8 +122,9 @@ function goldfish.actor.PerformOperation(operation, ply)
             return false, "tried to duplicate object " .. goldfish.actor.ToString(operation.objectName, operation.objectIndex)
         end
 
-        object = goldfish.actor.Instantiate(operation.objectName, operation.objectIndex)
+        object = goldfish.actor.Instantiate(operation.objectIndex, operation.objectName)
         object:SetVariables(operation.variables)
+
         if isfunction(object.OnSpawn) then
             object:OnSpawn()
         end
