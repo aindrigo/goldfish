@@ -20,7 +20,7 @@ end
 function goldfish.config.LoadNamespace(namespace, saveDirectory)
     saveDirectory = saveDirectory or goldfish.config.saveDirectory
 
-    local filePath = string.format("%s/%s.bin", saveDirectory, namespace)
+    local filePath = string.format("%s/%s.dat", saveDirectory, namespace)
     local dataFilePath = "data/" .. filePath
 
     if not file.Exists(dataFilePath, "GAME") then return end
