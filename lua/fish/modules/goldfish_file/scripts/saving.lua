@@ -36,8 +36,16 @@ function goldfish.file.Write( path, data )
         return
     end
 
+    local wd = ""
+    for dir in path:gmatch( "([^/]+)/" ) do
+        wd = wd..dir.."/"
+        if not file.IsDir( wd, "DATA" ) then
+            file.CreateDir( wd )
+        end
+    end
+
     local sData = serialize( data )
-    file.write( path, sData )
+    file.Write( path, sData )
 end
 
 --- @param path string
@@ -49,13 +57,12 @@ function goldfish.file.Read( path )
     local fileData = file.Read( path, "DATA" )
     if not fileData then return nil end
 
-    local data = deserialize( fileData )
-    return data
+    return deserialize( fileData )
 end
 
 --- @param module table
 --- @param name string
 --- @return string
 function goldfish.file.Name( module, name )
-    return "goldfish_saving/"..module.Path.."/"..name
+    return "goldfish_saving/"..module.Id.."/"..name
 end
