@@ -13,6 +13,10 @@ end
 --- @return goldfish.database.MemberType
 function pool:GetMemberType(name)
     local id = self._memberMap[name]
+    if not isnumber(id) then
+        debug.Trace()
+    end
+
     assert(isnumber(id), "no such value " .. name)
 
     local data = self._members[id]
@@ -24,7 +28,7 @@ end
 function pool:AddMember(data)
     assert(isstring(data.name), "expected string for .name, found " .. type(data.name))
 
-    if data.primary == nil then 
+    if data.primary == nil then
         data.primary = self._members[1] == nil
     end
 

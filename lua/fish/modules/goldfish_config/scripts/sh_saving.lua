@@ -29,7 +29,7 @@ function goldfish.config.LoadNamespace(namespace, saveDirectory)
     local optionValues = serial.DeserializeSingle(stream, goldfish.config.serialSettings)
 
     for id, value in pairs(optionValues) do
-        local option = options[id]
+        local option = nil --options[id]
         if not istable(option) then continue end
 
         local realm = option:GetRealm()

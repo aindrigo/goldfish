@@ -1,4 +1,4 @@
-function HOOKS:InitPostEntity()    
+function HOOKS:InitPostEntity()
     local optionsToWrite = {}
     for _, options in pairs(goldfish.config.options) do
         for _, option in pairs(options) do
