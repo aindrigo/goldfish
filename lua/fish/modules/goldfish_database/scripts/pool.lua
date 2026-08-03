@@ -40,7 +40,9 @@ function pool:AddMember(data)
         data.nullable = true
     end
 
-    self._memberMap[data.name] = table.insert(self._members, data)
+    local newIndex = #self._members + 1
+    self._members[newIndex] = data
+    self._memberMap[data.name] = newIndex
 end
 
 --- @return table members

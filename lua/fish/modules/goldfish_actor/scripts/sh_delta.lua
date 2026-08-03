@@ -172,5 +172,5 @@ function goldfish.actor.QueueOperation(operation)
         if not status then error(message) end
     end
 
-    table.insert(goldfish.actor.queue, operation)
+    goldfish.actor.queue[#goldfish.actor.queue + 1] = operation
 end

@@ -87,7 +87,7 @@ function query:AddSelector(key, value, compareOperation)
         value = serial.SerializeSingle(value, goldfish.database.serialSettings)
     end
 
-    table.insert(self._selectors, { key, value, compareOperation })
+    self._selectors[#self._selectors + 1] = { key, value, compareOperation }
 end
 
 --- adds a value to this query
@@ -101,7 +101,7 @@ function query:AddValue(key, value)
         value = serial.SerializeSingle(value, goldfish.database.serialSettings)
     end
 
-    table.insert(self._values, { key, value })
+    self._values[#self._values + 1] = { key, value }
 end
 
 --- initializes this query to be a SELECT query
@@ -163,7 +163,7 @@ end
 --- @param callback function
 function query:AddCallback(callback)
     self._callbacks = self._callbacks or {}
-    table.insert(self._callbacks, callback)
+    self._callbacks[#self._callbacks + 1] = callback
 end
 
 --- used in coroutines to yield until the query is finished
@@ -180,7 +180,7 @@ function query:Yield()
         return self:GetResult()
     end
 
-    table.insert(self._coroutines, co)
+    self._coroutines[#self._coroutines + 1] = co
     local status, result = coroutine.yield()
     return status, result
 end

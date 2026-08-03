@@ -553,7 +553,7 @@ _serial.decoders[_serial.Type.ARRAY] = function(stream, format, cursor, options)
         cursor = cursor + valueSize
         arraySize = arraySize + valueSize
 
-        table.insert(array, value)
+        array[#array + 1] = value
     end
 
     return array, 1 + byteCount + arraySize

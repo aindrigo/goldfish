@@ -29,7 +29,7 @@ function sqliteDriver:_BuildSelectors(selectors)
         end
 
         selectorString = selectorString .. key .. " = ?"
-        table.insert(selectorValues, value)
+        selectorValues[#selectorValues + 1] = value
 
         if index < selectorCount then
             selectorString = selectorString .. string.format(" %s ", compareOpString)
@@ -68,7 +68,7 @@ function sqliteDriver:_BuildQuery(query)
         local valuesString = "VALUES ("
         for index, valueData in ipairs(values) do
             local key, value = valueData[1], valueData[2]
-            table.insert(queryValues, value)
+            queryValues[#queryValues + 1] = value
 
             queryString = queryString .. key
             valuesString = valuesString .. "?"
@@ -95,7 +95,7 @@ function sqliteDriver:_BuildQuery(query)
             local key, value = valueData[1], valueData[2]
             valuesString = valuesString .. " " .. key .. " = ?"
 
-            table.insert(queryValues, value)
+            queryValues[#queryValues + 1] = value
 
             if index < valueCount then
                 valuesString = valuesString .. ","
@@ -130,7 +130,7 @@ end
 --- submits the given query to this driver
 --- @param query goldfish.database.Query
 function sqliteDriver:SubmitQuery(query)
-    table.insert(self._queries, query)
+    self._queries[#self._queries + 1] = query
 end
 
 --- internal: flushes the query queue
