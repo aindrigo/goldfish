@@ -148,8 +148,9 @@ function goldfish.actor.OptimizeOperations(operations)
         end
 
         if operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy then
-            newOperations[#newOperations + 1] = operation
-            objectInsertIndices[key] = #newOperations
+            local newIndex = #newOperations + 1
+            newOperations[newIndex] = operation
+            objectInsertIndices[key] = newIndex
         end
     end
 
