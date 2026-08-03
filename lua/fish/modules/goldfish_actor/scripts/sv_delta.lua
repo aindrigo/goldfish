@@ -148,7 +148,8 @@ function goldfish.actor.OptimizeOperations(operations)
         end
 
         if operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy then
-            objectInsertIndices[key] = table.insert(newOperations, operation)
+            newOperations[#newOperations + 1] = operation
+            objectInsertIndices[key] = #newOperations
         end
     end
 
@@ -165,10 +166,10 @@ function goldfish.actor.OptimizeOperations(operations)
                 local objectInsert = newOperations[objectInsertIndex]
                 objectInsert.variables[operation.variableName] = operation.value
             else
-                table.insert(newOperations, operation)
+                newOperations[#newOperations + 1] = operation
             end
         elseif operation.type ~= goldfish.actor.OperationType.ObjectCreate and operation.type ~= goldfish.actor.OperationType.ObjectDestroy then
-            table.insert(newOperations, operation)
+            newOperations[#newOperations + 1] = operation
         end
     end
 

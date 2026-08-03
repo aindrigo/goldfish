@@ -5,7 +5,7 @@ function HOOKS:InitPostEntity()
             if option:GetRealm() ~= fish.Realm.CLIENT then continue end
             if not option:HasFlag(goldfish.config.OptionFlags.REPLICATE) then continue end
 
-            table.insert(optionsToWrite, option)
+            optionsToWrite[#optionsToWrite + 1] = option
         end
     end
 

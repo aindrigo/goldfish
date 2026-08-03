@@ -40,7 +40,8 @@ function pool:AddMember(data)
         data.nullable = true
     end
 
-    self._memberMap[data.name] = table.insert(self._members, data)
+    self._members[#self._members + 1] = data
+    self._memberMap[data.name] = #self._members
 end
 
 --- @return table members

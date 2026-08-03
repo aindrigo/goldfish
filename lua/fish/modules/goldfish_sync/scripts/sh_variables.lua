@@ -56,7 +56,8 @@ function goldfish.sync.DefineVariable(name, typeId, flags)
     if isnumber(id) then
         goldfish.sync.variables[id] = variableData
     else
-        id = table.insert(goldfish.sync.variables, variableData)
+        goldfish.sync.variables[#goldfish.sync.variables + 1] = variableData
+        id = #goldfish.sync.variables
         goldfish.sync.variableNames[name] = id
     end
 
