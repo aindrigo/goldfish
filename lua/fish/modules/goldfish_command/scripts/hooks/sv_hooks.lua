@@ -8,7 +8,7 @@ function MODULE.Hooks:PlayerSay( client, text )
 
     if issue then
         client:ChatPrint( ("%s: %s - %s"):format( commandName, issue, problemToken ) )
-        return
+        return false
     end
 
     local command = goldfish.command.list[commandName]
@@ -21,4 +21,6 @@ function MODULE.Hooks:PlayerSay( client, text )
     elseif isstring( output ) then
         client:ChatPrint( output )
     end
+
+    return false
 end
