@@ -64,7 +64,7 @@ function HOOKS:Think()
         end
     end
 
-    local queue = goldfish.actor.queue -- goldfish.actor.OptimizeOperations(goldfish.actor.queue)
+    local queue = goldfish.actor.queue
     goldfish.actor.queue = {}
 
     if queue[1] ~= nil then
@@ -117,60 +117,4 @@ end
 
 function HOOKS:PlayerDisconnected(ply)
     goldfish.actor.states[ply:UserID()] = nil
-end
-
---- server-only, internal: optimizes operation list
---- @param operations table<goldfish.actor.Operation>
---- @return table<goldfish.actor.Operation>
-function goldfish.actor.OptimizeOperations(operations)
-    if operations[1] == nil then return operations end
-
-    local newOperations = {}
-    local objectCreations = {}
-
-    -- Iter 1: check for objects that are created or deleted
-    for _, operation in ipairs(operations) do
-        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-        if operation.type == goldfish.actor.OperationType.ObjectCreate then
-            objectCreations[key] = true
-        elseif operation.type == goldfish.actor.OperationType.ObjectDestroy then
-            objectCreations[key] = false
-        end
-    end
-
-
-    local objectInsertIndices = {}
-    -- Iter 2: insert object creations/destructions
-    for _, operation in ipairs(operations) do
-        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-        if objectCreations[key] == nil then
-            continue
-        end
-
-        if operation.type == goldfish.actor.OperationType.ObjectCreate or operation.type == goldfish.actor.OperationType.ObjectDestroy then
-            objectInsertIndices[key] = table.insert(newOperations, operation)
-        end
-    end
-
-    -- Iter 3: insert the rest
-    for _, operation in ipairs(operations) do
-        local key = goldfish.actor.ToString(operation.objectName, operation.objectIndex)
-        if objectCreations[key] == false and operation.type ~= goldfish.actor.OperationType.RemoteProcedureCall then
-            continue
-        end
-
-        if operation.type == goldfish.actor.OperationType.VariableSet or operation.type == goldfish.actor.OperationType.VariableReset then
-            local objectInsertIndex = objectInsertIndices[key]
-            if objectInsertIndex ~= nil then
-                local objectInsert = newOperations[objectInsertIndex]
-                objectInsert.variables[operation.variableName] = operation.value
-            else
-                table.insert(newOperations, operation)
-            end
-        elseif operation.type ~= goldfish.actor.OperationType.ObjectCreate and operation.type ~= goldfish.actor.OperationType.ObjectDestroy then
-            table.insert(newOperations, operation)
-        end
-    end
-
-    return newOperations
 end

@@ -26,6 +26,9 @@ function actor_base:VariableSet(id, value)
     local var = self.m_tVariables[id]
     assert(istable(var), "no such variable " .. id)
 
+    self:_VariableSet(id, value)
+    if not self:GetSpawned() then return end
+
     local observers = self:GetObservers()
     for i = 1, #observers do
         if not self:ObserverCanSee(observers[i], id) then
@@ -41,7 +44,6 @@ function actor_base:VariableSet(id, value)
         self:QueueOperation(goldfish.actor.OperationType.VariableReset, observers, id)
     end
 
-    self:_VariableSet(id, value)
 end
 
 --- server-only: get observers, defined to be re-implemented if necessary
