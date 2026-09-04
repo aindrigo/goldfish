@@ -38,7 +38,7 @@ function actor_base:VariableSet(id, value)
     end
 
     if value ~= nil then
-        assert(goldfish.sync.GetType(value) == var.type, "mismatching type for variable " .. id )
+        assert(goldfish.sync.GetType(value) == var.type, "mismatching type for variable " .. id)
         self:QueueOperation(goldfish.actor.OperationType.VariableSet, observers, id, value)
     else
         self:QueueOperation(goldfish.actor.OperationType.VariableReset, observers, id)
@@ -76,12 +76,12 @@ end
 --- server-only: spawns this object
 function actor_base:Spawn()
     assert(not self:GetSpawned(), "cannot spawn twice")
-    self:SetSpawned(true)
-
-    self:QueueOperation(goldfish.actor.OperationType.ObjectCreate, self:GetObservers(), self:GetVariables())
     if isfunction(self.OnSpawn) then
         self:OnSpawn()
     end
+
+    self:SetSpawned(true)
+    self:QueueOperation(goldfish.actor.OperationType.ObjectCreate, self:GetObservers(), self:GetVariables())
 end
 
 function actor_base:Trigger(name, ...)
