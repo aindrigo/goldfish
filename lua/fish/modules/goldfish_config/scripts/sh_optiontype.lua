@@ -5,7 +5,8 @@ goldfish.config.OptionType = {
     BOOLEAN = 2,
     VECTOR = 3,
     ANGLES = 4,
-    COLOR = 5
+    COLOR = 5,
+    KEYBIND = 6
 }
 
 --- gets the goldfish.config.OptionType of a value
@@ -28,4 +29,17 @@ function goldfish.config.GetOptionType(value)
     end
 
     return nil
+end
+
+--- gets the goldfish.config.OptionType of a value
+--- @param value any
+--- @param type goldfish.config.OptionType
+--- @return boolean
+function goldfish.config.OptionTypeEquals(value, type)
+    assert(value ~= nil, "cannot check the option type of a nil value")
+    if type == goldfish.config.OptionType.KEYBIND and isnumber(value) and value >= BUTTON_CODE_NONE and value <= BUTTON_CODE_LAST then
+        return true
+    end
+
+    return goldfish.config.GetOptionType(value) == type
 end

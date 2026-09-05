@@ -23,7 +23,7 @@ function option:Construct(data)
     assert(isnumber(data.type), "expected number for data.type, got " .. type(data.type))
 
     if istable(data.flags) then
-        data.flags = bit.bor(table.unpack(data.flags))
+        data.flags = bit.bor(unpack(data.flags))
     elseif data.flags ~= nil then
         assert(isnumber(data.flags), "expected number or table for data.flags, got " .. type(data.flags))
     else
@@ -89,7 +89,7 @@ end
 function option:_SetValue(value, ply)
     local currentValue = self:GetValue()
     if value ~= nil then
-        assert(goldfish.config.GetOptionType(value) == self:GetType(), "mismatching type")
+        assert(goldfish.config.OptionTypeEquals(value, self:GetType()), "mismatching type")
     end
 
     hook.Run("Goldfish_Config_OnOptionChange", self, currentValue, value, ply)
