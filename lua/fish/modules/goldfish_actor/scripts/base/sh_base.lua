@@ -22,6 +22,36 @@ function actor_base:VariableDefine(id, type, default)
     self.m_tVariables[id] = { ["type"] = type, ["default"] = default }
 end
 
+--- @param variableId string
+--- @param identifier string
+--- @param callback fun(string, any?)
+function actor_base:VariableChangeCallbackAdd(variableId, identifier, callback)
+    self.m_tVariableCallbacks = self.m_tVariableCallbacks or {}
+    local callbacks = self.m_tVariableCallbacks[variableId]
+    if not istable(callbacks) then
+        callbacks = {}
+        self.m_tVariableCallbacks[variableId] = callbacks
+    end
+
+    callbacks[identifier] = callback
+end
+
+--- @param variableId string
+--- @param identifier string
+function actor_base:VariableChangeCallbackRemove(variableId, identifier, callback)
+    self.m_tVariableCallbacks = self.m_tVariableCallbacks or {}
+    local callbacks = self.m_tVariableCallbacks[variableId]
+    assert(istable(callbacks), "no callbacks for " .. variableId)
+
+    callbacks[identifier] = nil
+    if table.Count(callbacks) < 1 then
+        self.m_tVariableCallbacks[variableId] = nil
+
+        if table.Count(m_tVariableCallbacks) < 1 then
+            self.m_tVariableCallbacks = nil
+        end
+    end
+end
 --- server-only: sets a variable's data
 --- @param id string
 --- @param default any
@@ -52,6 +82,15 @@ function actor_base:_VariableSet(id, value)
     self.m_tVariableData = self.m_tVariableData or {}
 
     self.m_tVariableData[id] = value
+
+    if istable(self.m_tVariableCallbacks) then
+        local callbacks = self.m_tVariableCallbacks[id]
+        if istable(callbacks) then
+            for _, cb in pairs(callbacks) do
+                cb(id, value)
+            end
+        end
+    end
 end
 
 --- gets all variables of this object
