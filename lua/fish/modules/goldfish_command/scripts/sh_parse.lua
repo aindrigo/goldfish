@@ -1,3 +1,4 @@
+goldfish.command.aliases = {}
 
 --- @param text string full command text
 function goldfish.command.GetTokensAndFlags( text )
@@ -64,7 +65,7 @@ end
 function goldfish.command.VerifyTokensAndFlags( commandName, flags, tokens )
     local command = goldfish.command.list[commandName]
 
-    local aliasDef = self.aliases[commandName]
+    local aliasDef = goldfish.command.aliases[commandName]
     if (not command) and aliasDef then
         command = goldfish.command.list[aliasDef]
         commandName = aliasDef
