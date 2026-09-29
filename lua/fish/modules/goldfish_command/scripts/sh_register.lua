@@ -31,5 +31,5 @@ function goldfish.command.Register( data )
     data.realm = data.realm or fish.Realm.SERVER
     data.params = data.params or {}
 
-    goldfish.command.list[data.name] = data
+    goldfish.command.list[data.name:lower()] = data
 end
