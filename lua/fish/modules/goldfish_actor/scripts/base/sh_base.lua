@@ -87,7 +87,7 @@ function actor_base:_VariableSet(id, value)
         local callbacks = self.m_tVariableCallbacks[id]
         if istable(callbacks) then
             for _, cb in pairs(callbacks) do
-                cb(id, value)
+                cb(self, id, value)
             end
         end
     end
