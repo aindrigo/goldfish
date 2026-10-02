@@ -16,7 +16,7 @@ goldfish.command.Type = {
 --- @class goldfish.command.data
 --- @field name string
 --- @field summary? string
---- @field Run fun( command: string, tokens: table, flags: table, text: string, ply: Player ): string
+--- @field Run fun( command: string, tokens: table, flags: table, text: string, ply: Player ): string?
 --- @field adminOnly? boolean
 --- @field superAdminOnly? boolean
 --- @field realm? fish.Realm defaults to fish.Realm.SERVER
