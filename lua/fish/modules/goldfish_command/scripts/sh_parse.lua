@@ -75,9 +75,11 @@ function goldfish.command.VerifyTokensAndFlags( commandName, flags, tokens )
         return "bad command", commandName
     end
 
-    for flag in pairs( flags ) do
-        if not command.flags[flag] then
-            return "bad flag", flag
+    if command.flags then
+        for flag in pairs( flags ) do
+            if not command.flags[flag] then
+                return "bad flag", flag
+            end
         end
     end
 
