@@ -14,7 +14,7 @@ goldfish.command.Type = {
 --- @field type goldfish.command.Type
 
 --- @class goldfish.command.data
---- @field name string
+--- @field name string | string[]
 --- @field summary? string
 --- @field Run fun( command: string, tokens: table, flags: table, text: string, ply: Player ): string?
 --- @field adminOnly? boolean
@@ -31,5 +31,19 @@ function goldfish.command.Register( data )
     data.realm = data.realm or fish.Realm.SERVER
     data.params = data.params or {}
 
-    goldfish.command.list[data.name:lower()] = data
+    if isstring( data.name ) then
+        --- @diagnostic disable-next-line
+        local name = data.name:lower()
+        data.id = name
+        goldfish.command.list[name] = data
+    elseif istable( data.name ) then
+        local realName = data.name[1]:lower()
+        data.id = realName
+        goldfish.command.list[realName] = data
+
+        for i = 2, #data.name do
+            goldfish.command.aliases[data.name[i]:lower()] = realName
+        end
+    end
+
 end

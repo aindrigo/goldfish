@@ -1,4 +1,3 @@
-goldfish.command.aliases = {}
 
 --- @param text string full command text
 function goldfish.command.GetTokensAndFlags( text )
@@ -54,8 +53,22 @@ function goldfish.command.GetTokensAndFlags( text )
     command = ( tokens[1] ):lower()
     table.remove( tokens, 1 )
 
+
+
     return command, flags, tokens
 end
+
+
+--- @param commandName string
+--- @return string
+function goldfish.command.GetRealCommandName( commandName )
+    local command = goldfish.command.list[commandName]
+    if command then return commandName end
+
+    local aliasDef = goldfish.command.aliases[commandName]
+    return aliasDef
+end
+
 
 --- @param commandName string
 --- @param flags table
@@ -68,7 +81,7 @@ function goldfish.command.VerifyTokensAndFlags( commandName, flags, tokens )
     local aliasDef = goldfish.command.aliases[commandName]
     if (not command) and aliasDef then
         command = goldfish.command.list[aliasDef]
-        commandName = aliasDef
+        commandName = command.id
     end
 
     if not command then
