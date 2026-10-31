@@ -5,14 +5,29 @@ function goldfish.command.GetTokensAndFlags( text )
     local flags = {}
     local tokens = {}
     local skip = 0
+    local inString = false
+    local escapeNext = false
     local working_token = ""
 
     for i = 1, #text do
         if i <= skip then continue end
+        local escape = escapeNext
+        escapeNext = false
 
         local char = text[i]
 
-        if char == "-" then
+        if char == "\"" and not escape then
+            if inString then
+                tokens[#tokens + 1] = working_token
+                working_token = ""
+            else
+                inString = true
+            end
+        elseif char == "\\" and not escape then
+            escapeNext = true
+        elseif inString then
+            working_token = working_token..char
+        elseif char == "-" and not escape then
             local flagsStart = text:sub(i) .. " "
             local textFlags = flagsStart:match( "%b- " ):sub( 2, -2 )
             local newFlags = string.Explode( "", textFlags )
@@ -21,24 +36,13 @@ function goldfish.command.GetTokensAndFlags( text )
             end
 
             skip = i + #textFlags + 1
-        elseif char == "\"" then
-            local text_in_quotes = text:sub( i ):match( "%b\"\"" )
-
-            if text_in_quotes then
-                working_token = ""
-                skip = i + #text_in_quotes
-                tokens[#tokens + 1] = text_in_quotes:sub( 2, -2 )
-            else
-                -- take " as literal
-                working_token = working_token..char
-            end
-        elseif char == " " and working_token ~= "" then
+        elseif char == " " and working_token ~= "" and not escape then
             -- end current token
             tokens[#tokens + 1] = working_token
             working_token = ""
         else
             -- discard extra whitespace
-            if char == " " and working_token == "" then
+            if char == " " and working_token == "" and not escape then
                 continue
             end
 
