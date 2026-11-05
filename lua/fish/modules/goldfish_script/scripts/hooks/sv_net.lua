@@ -1,5 +1,0 @@
-util.AddNetworkString("goldfish.script.Instantiate")
-util.AddNetworkString("goldfish.script.Destroy")
-util.AddNetworkString("goldfish.script.FullUpdate")
-util.AddNetworkString("goldfish.script.UpdateSources")
-util.AddNetworkString("goldfish.script.SetState")

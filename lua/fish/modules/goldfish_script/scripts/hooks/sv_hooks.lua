@@ -1,7 +1,0 @@
-gameevent.Listen("OnRequestFullUpdate")
-function HOOKS:OnRequestFullUpdate(data)
-    local ply = Player(data.userid)
-    if not IsValid(ply) then return end
-
-    goldfish.script.FullUpdate(ply)
-end
